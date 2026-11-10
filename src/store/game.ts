@@ -1,0 +1,374 @@
+// Store unique de l'app : la partie en cours, le dernier récap et l'unité d'affichage.
+//
+// - Chaque action « métier » ajoute, modifie ou retire des événements ; balances et stats restent
+//   dérivées par lib/ (jamais stockées).
+// - Toutes les mises à jour sont immuables : l'état précédent est conservé par simple référence,
+//   ce qui rend `undo()` gratuit (instantané gardé 5 s, non persisté).
+// - Une action refusée (mauvais statut, montant invalide…) ne change rien et renvoie `false`.
+// - `finish` range la partie terminée dans `lastRecap` et remet une partie vierge dans `game` :
+//   l'UI affiche le récap tant que `lastRecap` existe ; `newGame` l'efface.
+//
+// Fabrique sans React (zustand/vanilla) : testable sous Node avec un stockage en mémoire.
+// L'instance de l'app et le hook Preact sont dans useGame.ts.
+import { createStore } from 'zustand/vanilla'
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { summarizePlayers } from '../lib/derive'
+import { finalBalances, type FinalStack } from '../lib/discrepancy'
+import { MAX_SEATED, MIN_PLAYERS_TO_START, nextPlayerColor } from '../lib/players'
+import { settle, type Transfer } from '../lib/settlement'
+import type { ChipConfig, DiscrepancyResolution, Game, GameEvent, GameEventType, Player, Unit } from '../lib/types'
+
+export const STORAGE_KEY = 'pokervice'
+/** Version du schéma persisté : l'incrémenter impose d'écrire la migration dans `migrate`. */
+export const SCHEMA_VERSION = 1
+export const UNDO_MS = 5000
+export const DEFAULT_BUY_IN_CENTS = 2000
+
+export interface LastRecap {
+  /** Partie terminée, figée (statut `finished`, événements `final` compris). */
+  game: Game
+  /** Virements exacts au centime ; l'option « Arrondir à l'euro » se dérive avec `roundTransfers`. */
+  transfers: Transfer[]
+}
+
+export interface PersistedState {
+  game: Game
+  lastRecap: LastRecap | null
+  unit: Unit
+}
+
+export type UndoableAction =
+  | 'setBuyIn'
+  | 'addPlayer'
+  | 'renamePlayer'
+  | 'setColor'
+  | 'deletePlayer'
+  | 'reorderSeats'
+  | 'setChipConfig'
+  | 'start'
+  | 'rebuy'
+  | 'leave'
+  | 'return'
+  | 'editEvent'
+  | 'deleteEvent'
+  | 'finish'
+  | 'newGame'
+
+export interface UndoEntry {
+  action: UndoableAction
+  playerId?: string
+  /** Heure (ms) jusqu'à laquelle `undo()` est accepté. */
+  until: number
+  prev: PersistedState
+}
+
+export interface AddPlayerOptions {
+  /** Par défaut, la première couleur libre de la palette. */
+  color?: string
+  /** Buy-in enregistré si la partie a démarré ; par défaut le buy-in commun. */
+  buyInCents?: number
+}
+
+export interface GameActions {
+  setBuyIn(cents: number): boolean
+  /** Renvoie l'id du joueur créé, ou `null` si refusé (nom vide, table pleine, partie close). */
+  addPlayer(name: string, opts?: AddPlayerOptions): string | null
+  renamePlayer(playerId: string, name: string): boolean
+  setColor(playerId: string, color: string): boolean
+  /** Seulement pour un joueur sans aucune transaction. */
+  deletePlayer(playerId: string): boolean
+  /**
+   * Redistribue les places occupées par `playerIds` dans l'ordre donné.
+   * Échanger A et B : `reorderSeats([B, A])` ; une permutation complète marche aussi.
+   */
+  reorderSeats(playerIds: readonly string[]): boolean
+  /** Possible avant « Démarrer », ou après s'il n'y a pas encore de configuration (SPEC §2.2). */
+  setChipConfig(cfg: ChipConfig | undefined): boolean
+  start(): boolean
+  rebuy(playerId: string, cents: number): boolean
+  leave(playerId: string, stackCents: number): boolean
+  return(playerId: string, buyInCents: number): boolean
+  editEvent(eventId: string, patch: { amountCents?: number; at?: number }): boolean
+  deleteEvent(eventId: string): boolean
+  /**
+   * Termine la partie avec le stack final de chaque joueur assis (tous, et eux seuls).
+   * `resolution` est requise s'il y a un écart de comptage ; refusé si l'écart reste non résolu.
+   */
+  finish(finals: readonly FinalStack[], resolution?: DiscrepancyResolution): boolean
+  /** Efface le récap (ou abandonne la partie en cours) et repart d'une table vide. */
+  newGame(): boolean
+  setUnit(unit: Unit): boolean
+  setWakeLock(on: boolean): void
+  /** Restaure l'état d'avant la dernière action, si elle date de moins de 5 s. */
+  undo(): boolean
+}
+
+export type GameState = PersistedState & { undoable: UndoEntry | null } & GameActions
+
+// ——— Aides pures ———
+
+let idCounter = 0
+/** Id court et unique. Pas de `crypto.randomUUID` : absent hors contexte sécurisé (http sur le wifi). */
+function makeId(): string {
+  idCounter = (idCounter + 1) % 1296
+  return Date.now().toString(36) + idCounter.toString(36).padStart(2, '0') + Math.random().toString(36).slice(2, 6)
+}
+
+export function blankGame(defaultBuyInCents = DEFAULT_BUY_IN_CENTS, wakeLock = false, now = Date.now()): Game {
+  return { version: SCHEMA_VERSION, status: 'setup', createdAt: now, defaultBuyInCents, players: [], events: [], wakeLock }
+}
+
+function isCents(v: number, allowZero: boolean): boolean {
+  return Number.isSafeInteger(v) && (allowZero ? v >= 0 : v > 0)
+}
+
+function isValidChipConfig(cfg: ChipConfig): boolean {
+  const { num, den } = cfg.centsPerPoint
+  return (
+    Number.isSafeInteger(num) && num > 0 && Number.isSafeInteger(den) && den > 0 &&
+    Number.isSafeInteger(cfg.bbPoints) && cfg.bbPoints > 0 &&
+    Number.isSafeInteger(cfg.sbPoints) && cfg.sbPoints > 0
+  )
+}
+
+function event(type: GameEventType, playerId: string, amountCents: number, at: number): GameEvent {
+  return { id: makeId(), at, type, playerId, amountCents }
+}
+
+function seatedCount(game: Game): number {
+  let n = 0
+  for (const s of summarizePlayers(game).values()) if (s.status === 'seated') n += 1
+  return n
+}
+
+function statusOf(game: Game, playerId: string) {
+  return summarizePlayers(game).get(playerId)?.status
+}
+
+// ——— Store ———
+
+export function createGameStore(storage: StateStorage) {
+  return createStore<GameState>()(
+    persist(
+      (set, get) => {
+        /** La partie modifiable : ni récap affiché, ni partie close. */
+        const openGame = (): Game | null => {
+          const { game, lastRecap } = get()
+          return lastRecap || game.status === 'finished' ? null : game
+        }
+
+        /** Applique un changement et garde l'état précédent pour `undo()`. */
+        const commit = (action: UndoableAction, next: Partial<PersistedState>, playerId?: string) => {
+          set((s) => ({
+            ...next,
+            undoable: { action, playerId, until: Date.now() + UNDO_MS, prev: { game: s.game, lastRecap: s.lastRecap, unit: s.unit } },
+          }))
+        }
+
+        const updatePlayer = (action: UndoableAction, playerId: string, patch: Partial<Player>): boolean => {
+          const game = openGame()
+          if (!game?.players.some((p) => p.id === playerId)) return false
+          commit(action, { game: { ...game, players: game.players.map((p) => (p.id === playerId ? { ...p, ...patch } : p)) } }, playerId)
+          return true
+        }
+
+        const appendEvent = (action: UndoableAction, ev: GameEvent): void => {
+          const game = get().game
+          commit(action, { game: { ...game, events: [...game.events, ev] } }, ev.playerId)
+        }
+
+        return {
+          game: blankGame(),
+          lastRecap: null,
+          unit: 'eur',
+          undoable: null,
+
+          setBuyIn(cents) {
+            const game = openGame()
+            if (!game || !isCents(cents, false)) return false
+            commit('setBuyIn', { game: { ...game, defaultBuyInCents: cents } })
+            return true
+          },
+
+          addPlayer(name, opts = {}) {
+            const game = openGame()
+            const trimmed = name.trim()
+            if (!game || !trimmed || seatedCount(game) >= MAX_SEATED) return null
+            const buyIn = opts.buyInCents ?? game.defaultBuyInCents
+            if (game.status === 'running' && !isCents(buyIn, false)) return null
+            const player: Player = {
+              id: makeId(),
+              name: trimmed,
+              color: opts.color ?? nextPlayerColor(game.players),
+              seatOrder: game.players.reduce((m, p) => Math.max(m, p.seatOrder + 1), 0),
+            }
+            const events = game.status === 'running' ? [...game.events, event('buyin', player.id, buyIn, Date.now())] : game.events
+            commit('addPlayer', { game: { ...game, players: [...game.players, player], events } }, player.id)
+            return player.id
+          },
+
+          renamePlayer(playerId, name) {
+            const trimmed = name.trim()
+            return trimmed ? updatePlayer('renamePlayer', playerId, { name: trimmed }) : false
+          },
+
+          setColor(playerId, color) {
+            return color ? updatePlayer('setColor', playerId, { color }) : false
+          },
+
+          deletePlayer(playerId) {
+            const game = openGame()
+            if (!game?.players.some((p) => p.id === playerId)) return false
+            if (game.events.some((e) => e.playerId === playerId)) return false
+            commit('deletePlayer', { game: { ...game, players: game.players.filter((p) => p.id !== playerId) } }, playerId)
+            return true
+          },
+
+          reorderSeats(playerIds) {
+            const game = openGame()
+            if (!game || playerIds.length === 0 || new Set(playerIds).size !== playerIds.length) return false
+            const byId = new Map(game.players.map((p) => [p.id, p]))
+            if (!playerIds.every((id) => byId.has(id))) return false
+            const slots = playerIds.map((id) => byId.get(id)!.seatOrder).sort((a, b) => a - b)
+            const newOrder = new Map(playerIds.map((id, i) => [id, slots[i]!]))
+            const players = game.players.map((p) => (newOrder.has(p.id) ? { ...p, seatOrder: newOrder.get(p.id)! } : p))
+            commit('reorderSeats', { game: { ...game, players } })
+            return true
+          },
+
+          setChipConfig(cfg) {
+            const game = openGame()
+            if (!game) return false
+            // Verrouillée dès « Démarrer » : en cours de partie, on peut seulement en créer une.
+            if (game.status === 'running' && (game.chipConfig || !cfg)) return false
+            if (cfg && !isValidChipConfig(cfg)) return false
+            commit('setChipConfig', { game: { ...game, chipConfig: cfg }, unit: cfg ? get().unit : 'eur' })
+            return true
+          },
+
+          start() {
+            const game = openGame()
+            if (!game || game.status !== 'setup' || game.players.length < MIN_PLAYERS_TO_START) return false
+            const now = Date.now()
+            const seats = [...game.players].sort((a, b) => a.seatOrder - b.seatOrder)
+            const buyIns = seats.map((p) => event('buyin', p.id, game.defaultBuyInCents, now))
+            commit('start', { game: { ...game, status: 'running', startedAt: now, events: [...game.events, ...buyIns] } })
+            return true
+          },
+
+          rebuy(playerId, cents) {
+            const game = openGame()
+            if (game?.status !== 'running' || !isCents(cents, false) || statusOf(game, playerId) !== 'seated') return false
+            appendEvent('rebuy', event('rebuy', playerId, cents, Date.now()))
+            return true
+          },
+
+          leave(playerId, stackCents) {
+            const game = openGame()
+            if (game?.status !== 'running' || !isCents(stackCents, true) || statusOf(game, playerId) !== 'seated') return false
+            appendEvent('leave', event('leave', playerId, stackCents, Date.now()))
+            return true
+          },
+
+          return(playerId, buyInCents) {
+            const game = openGame()
+            if (game?.status !== 'running' || !isCents(buyInCents, false) || statusOf(game, playerId) !== 'left') return false
+            if (seatedCount(game) >= MAX_SEATED) return false
+            appendEvent('return', event('return', playerId, buyInCents, Date.now()))
+            return true
+          },
+
+          editEvent(eventId, patch) {
+            const game = openGame()
+            const ev = game?.events.find((e) => e.id === eventId)
+            if (game?.status !== 'running' || !ev) return false
+            const amountCents = patch.amountCents ?? ev.amountCents
+            const at = patch.at ?? ev.at
+            if (!isCents(amountCents, ev.type === 'leave') || !Number.isSafeInteger(at)) return false
+            // Tri stable par heure : à heure égale, l'ordre de saisie est conservé.
+            const events = game.events.map((e) => (e.id === eventId ? { ...e, amountCents, at } : e)).sort((a, b) => a.at - b.at)
+            commit('editEvent', { game: { ...game, events } }, ev.playerId)
+            return true
+          },
+
+          deleteEvent(eventId) {
+            const game = openGame()
+            const ev = game?.events.find((e) => e.id === eventId)
+            if (game?.status !== 'running' || !ev) return false
+            commit('deleteEvent', { game: { ...game, events: game.events.filter((e) => e.id !== eventId) } }, ev.playerId)
+            return true
+          },
+
+          finish(finals, resolution) {
+            const game = openGame()
+            if (game?.status !== 'running') return false
+            const seated = [...summarizePlayers(game).values()].filter((s) => s.status === 'seated').map((s) => s.playerId)
+            const finalIds = new Set(finals.map((f) => f.playerId))
+            if (finalIds.size !== finals.length || finalIds.size !== seated.length || !seated.every((id) => finalIds.has(id))) return false
+            if (!finals.every((f) => isCents(f.cents, true))) return false
+
+            const now = Date.now()
+            const draft: Game = {
+              ...game,
+              status: 'finished',
+              endedAt: now,
+              events: [...game.events, ...finals.map((f) => event('final', f.playerId, f.cents, now))],
+              discrepancyResolution: undefined,
+            }
+            let fb = finalBalances(draft)
+            if (!fb.resolved && resolution) {
+              draft.discrepancyResolution = resolution
+              fb = finalBalances(draft)
+            }
+            if (!fb.resolved) return false
+            const transfers = settle([...fb.balances].map(([playerId, balanceCents]) => ({ playerId, balanceCents })))
+            commit('finish', { lastRecap: { game: draft, transfers }, game: blankGame(game.defaultBuyInCents, game.wakeLock, now) })
+            return true
+          },
+
+          newGame() {
+            const { game } = get()
+            commit('newGame', { lastRecap: null, game: blankGame(game.defaultBuyInCents, game.wakeLock), unit: 'eur' })
+            return true
+          },
+
+          setUnit(unit) {
+            const { game, lastRecap } = get()
+            const cfg = lastRecap ? lastRecap.game.chipConfig : game.chipConfig
+            if (unit !== 'eur' && !cfg) return false
+            set({ unit })
+            return true
+          },
+
+          setWakeLock(on) {
+            set((s) => ({ game: { ...s.game, wakeLock: on } }))
+          },
+
+          undo() {
+            const { undoable: u } = get()
+            if (!u || Date.now() > u.until) {
+              if (u) set({ undoable: null })
+              return false
+            }
+            // L'écran allumé est une préférence, pas une action : on ne la remonte pas dans le temps.
+            set((s) => {
+              const { game } = u.prev
+              return { ...u.prev, game: game.wakeLock === s.game.wakeLock ? game : { ...game, wakeLock: s.game.wakeLock }, undoable: null }
+            })
+            return true
+          },
+        }
+      },
+      {
+        name: STORAGE_KEY,
+        version: SCHEMA_VERSION,
+        storage: createJSONStorage<PersistedState>(() => storage),
+        partialize: ({ game, lastRecap, unit }): PersistedState => ({ game, lastRecap, unit }),
+        // Point d'entrée des migrations futures : `if (version < 2) { …transformer… }`.
+        migrate: (persisted) => persisted as PersistedState,
+      },
+    ),
+  )
+}
+
+export type GameStore = ReturnType<typeof createGameStore>

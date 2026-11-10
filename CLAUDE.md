@@ -11,7 +11,7 @@ Documents de référence (à lire avant toute tâche) :
 - Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md`.
 
 ## État
-La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étapes 0 à 3 faites (`lib/` : `types`, `money`, `units`, `derive`, `settlement`, `discrepancy`, `chips` + tests ; page « Hello » temporaire dans `src/ui/App.tsx`). Prochaine étape : **4 (store et persistance)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
+La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étapes 0 à 4 faites (`lib/` testé ; store `src/store/game.ts` + hook `useGame` ; page « Hello » temporaire dans `src/ui/App.tsx`). Prochaine étape : **5 (composants de base et table)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
 
 ## Commandes
 - `npm run dev` (localhost:5173), `npm run dev:lan` (téléphone en wifi), `npm run build` (`tsc -b` puis `vite build`), `npm run preview`
@@ -22,6 +22,7 @@ La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : l
 - Node 26 ARM64 dans `C:\Program Files\nodejs`. Dans le shell Bash de Claude, il peut manquer au PATH : préfixer `export PATH="/c/Program Files/nodejs:$PATH" &&`.
 - Tokens de DESIGN §2 dans `@theme` de `src/styles/index.css` : `--color-x` → `bg-x`/`text-x`, `--radius-card` → `rounded-card`, `--shadow-card` → `shadow-card`, `--text-hero` → `text-hero`, `font-display` = Fraunces. Feutre/bois via `var(--felt)` etc. dans `:root`. Classe `num` = `tabular-nums`.
 - Statut assis/parti **dérivé** du dernier `leave`/`return` (par `at`), pas stocké dans `Player`. Arrondis entiers via `divRound`/`divFloor` de `money.ts` (jamais `Math.round(a/b)`).
+- Store : fabrique `createGameStore(storage)` (vanilla, testée sous Node avec un stockage mémoire) ; l'instance `gameStore` et `useGame(selector)` sont dans `store/useGame.ts`. Les actions renvoient `false` (ou `null`) si refusées. `finish` met la partie close dans `lastRecap` et une table vierge dans `game` : l'UI affiche le récap tant que `lastRecap` existe. Ne jamais muter l'état (l'annulation repose sur les références).
 - Preact : attribut `class` (pas `className`) ; `react` est aliasé vers `preact/compat` dans `tsconfig.app.json`.
 - `base` de Vite vient de `BASE_PATH` (fourni par `.github/workflows/deploy.yml` = `/<nom-du-dépôt>/`), `/` en local.
 

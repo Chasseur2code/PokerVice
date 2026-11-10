@@ -66,7 +66,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - Fonction de recalcul pour l'édition manuelle (totaux, réserve, recaves possibles).
 - **Vérif** : tests avec 4 à 7 couleurs et des quantités réalistes (par ex. une mallette de 300 ou 500 jetons) à 100 BB, plus un cas impossible (critère 6).
 
-### [ ] Étape 4 — Store et persistance (`store/game.ts`)
+### [x] Étape 4 — Store et persistance (`store/game.ts`)
 - État : `game` (une partie) + `lastRecap`. Actions : `setBuyIn`, `addPlayer`, `renamePlayer`, `setColor`, `deletePlayer` (seulement sans transaction), `reorderSeats`, `setChipConfig` (refusée si `running`), `start`, `rebuy`, `leave`, `return`, `editEvent`, `deleteEvent`, `finish`, `newGame`, `setUnit`, `setWakeLock`.
 - Annulation : chaque action garde l'état précédent (instantané) ; `undo()` est disponible pendant 5 s.
 - `persist` : clé `pokervice`, `version: 1`, `migrate` prêt pour plus tard.

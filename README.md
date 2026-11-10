@@ -58,4 +58,5 @@ Les morceaux se relient dans un seul sens : **`ui/` lit `store/` et appelle `lib
 
 - La partie est stockée comme une suite d'**événements horodatés** (`buyin`, `rebuy`, `leave`, `return`, `final`). Balances et statistiques ne sont jamais stockées : elles sont recalculées à partir des événements, ce qui rend l'historique modifiable et l'annulation triviales.
 - Toute la logique de calcul vit dans `lib/`, sans dépendance à l'UI, et est testée unitairement.
+- Le store (`store/game.ts`) est persisté dans `localStorage` (clé `pokervice`, schéma versionné) après chaque action. Les mises à jour sont immuables : l'état précédent est gardé par référence, et « Annuler » le restaure pendant 5 s.
 - L'argent est manipulé en **centimes entiers** ; aucun calcul monétaire en virgule flottante.
