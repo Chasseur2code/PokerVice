@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+/* Polices auto-hébergées (fontsource, woff2, sous-ensemble latin, font-display: swap). */
+@import '@fontsource/fraunces/latin-600.css';
+@import '@fontsource/fraunces/latin-700.css';
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+
+/*
+ * Design tokens (DESIGN.md §2). Chaque variable de @theme devient une classe Tailwind :
+ * --color-surface -> bg-surface / text-surface / border-surface, --radius-card -> rounded-card, etc.
+ */
+@theme {
+  /* §2.1 Interface */
+  --color-bg: #f5f1e9;
+  --color-surface: #fffdf8;
+  --color-surface-muted: #e9e1d3;
+  --color-border: #ede5d7;
+  --color-border-strong: #d9cdbb;
+  --color-border-dashed: #b9a88f;
+  --color-text: #2b2118;
+  --color-text-muted: #6b5a48;
+  --color-text-faint: #8c7a63;
+  --color-accent: #d4952a;
+  --color-on-accent: #2b1a05;
+  --color-accent-text: #7a4a0c;
+  --color-accent-halo: rgba(200, 134, 42, 0.28);
+  --color-brand-green: #1f6b45;
+  --color-gain: #1c6b3f;
+  --color-loss: #b42318;
+  --color-disabled-bg: #e4dacb;
+  --color-toast-bg: #2b2118;
+
+  /* §2.2 Table */
+  --color-wood: #6e4428;
+  --color-on-felt: #ffffff;
+  --color-on-felt-muted: rgba(255, 255, 255, 0.8);
+
+  /* §2.3 Joueurs, dans l'ordre d'attribution */
+  --color-player-1: #e5484d;
+  --color-player-2: #3e63dd;
+  --color-player-3: #f59e0b;
+  --color-player-4: #8e4ec6;
+  --color-player-5: #12a594;
+  --color-player-6: #e93d82;
+  --color-player-7: #f76b15;
+  --color-player-8: #05a2c2;
+  --color-player-9: #a18072;
+  --color-player-10: #6b7280;
+
+  /* §2.4 Jetons : fond + anneau intérieur de 3 px */
+  --color-chip-white: #ffffff;
+  --color-chip-white-ring: #cfc6b8;
+  --color-chip-red: #d63a3a;
+  --color-chip-red-ring: #f1b5b5;
+  --color-chip-green: #1f8a4c;
+  --color-chip-green-ring: #a9dabc;
+  --color-chip-blue: #2f5bd3;
+  --color-chip-blue-ring: #b4c6f4;
+  --color-chip-black: #1f1f1f;
+  --color-chip-black-ring: #8a8a8a;
+  --color-chip-purple: #7d3fc0;
+  --color-chip-purple-ring: #d2b8ef;
+  --color-chip-yellow: #f2c230;
+  --color-chip-yellow-ring: #fae7a6;
+  --color-chip-pink: #e0457b;
+  --color-chip-pink-ring: #f6bcd0;
+  --color-chip-orange: #ee7a1e;
+  --color-chip-orange-ring: #f8cda6;
+  --color-chip-gray: #8b8f96;
+  --color-chip-gray-ring: #d3d5d9;
+
+  /* §2.5 Typographie */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --text-logo: 22px;
+  --text-logo--letter-spacing: -0.3px;
+  --text-hero: 34px;
+  --text-hero--line-height: 1.1;
+  --text-felt-big: 30px;
+  --text-felt-big--line-height: 1.1;
+  --text-buyin: 28px;
+  --text-buyin--line-height: 1.1;
+  --text-felt-title: 22px;
+  --text-caps: 12px;
+  --text-caps--letter-spacing: 0.8px;
+  --text-body: 14px;
+  --text-seat-name: 13px;
+  --text-btn: 17px;
+
+  /* §2.6 Formes */
+  --radius-card: 16px;
+  --radius-seat: 14px;
+  --radius-btn: 14px;
+  --radius-row: 12px;
+  --radius-seg: 12px;
+  --radius-seg-item: 9px;
+  --radius-sheet: 20px;
+  --shadow-card: 0 1px 2px rgba(60, 40, 20, 0.08), 0 0 0 1px rgba(60, 40, 20, 0.06);
+  --shadow-seat: 0 3px 8px rgba(40, 25, 10, 0.22);
+  --shadow-halo: 0 0 0 6px var(--color-accent-halo);
+  --shadow-table: 0 10px 24px rgba(60, 35, 15, 0.28), inset 0 0 0 2px rgba(255, 255, 255, 0.1),
+    inset 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* Valeurs composites de la table (pas des classes Tailwind, utilisées via var()). */
+:root {
+  --felt: radial-gradient(ellipse at 50% 38%, #2f8a57 0%, #217049 55%, #175636 100%);
+  --wood-width: 14px;
+  --rail-inset: 28px;
+  --rail-border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+}
+
+/* À appliquer sur tous les montants : les chiffres ne « dansent » pas. */
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
