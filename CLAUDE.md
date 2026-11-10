@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Documents de référence (à lire avant toute tâche) :
 - `SPEC.md` : le fonctionnel (fait foi pour le comportement et les règles de calcul).
 - `DESIGN.md` : le visuel, direction « Feutre » (fait foi pour couleurs, typo, dimensions, géométrie de la table).
-- Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md` (à créer).
+- Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md`.
 
 ## État
 La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étape 0 faite (squelette, page « Hello » temporaire dans `src/ui/App.tsx`, `src/lib/smoke.test.ts` à supprimer quand `lib/` aura de vrais tests). Prochaine étape : **1 (modèle et calculs de base)**. Dépôt GitHub pas encore créé ni poussé.
