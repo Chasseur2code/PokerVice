@@ -61,7 +61,7 @@ export function apportion(totalCents: number, weights: readonly number[]): numbe
  * - `prorata` : l'argent en jeu est réparti au prorata des stacks comptés (plus fort reste).
  *   Impossible si tous les stacks sont nuls : on renvoie alors `null`.
  * - `assign` : tout l'écart est reporté sur un joueur (son stack peut devenir négatif s'il
- *   manque plus que ce qu'il a ; c'est à l'UI de le signaler).
+ *   y a plus en trop que ce qu'il a : à signaler dans l'UI, le store le refuse).
  */
 export function resolveDiscrepancy(
   finals: readonly FinalStack[],
@@ -85,6 +85,11 @@ export function resolveDiscrepancy(
 export interface FinalBalances {
   /** Balance par joueur (partis compris), écart résolu. Vide si l'écart n'est pas résolu. */
   balances: Map<string, number>
+  /**
+   * Stacks comptés après résolution (vide si non résolu) : les stacks finaux, ou les stacks de
+   * sortie si tout le monde est parti avant la fin. Un stack négatif est à refuser côté appelant.
+   */
+  stacks: FinalStack[]
   /** Écart brut, avant résolution. */
   discrepancyCents: number
   /** `false` tant qu'un écart existe sans résolution valable. */
@@ -94,10 +99,13 @@ export interface FinalBalances {
 /**
  * Balances finales d'une partie : investi, sorties (`leave`) et stacks finaux (`final`), écart
  * résolu selon `game.discrepancyResolution`. Une fois résolues, leur somme vaut exactement 0.
+ *
+ * Sans aucun stack final (tout le monde est parti avant la fin), l'écart porte sur les stacks de
+ * sortie des joueurs partis, qui doivent alors totaliser l'argent investi.
  */
 export function finalBalances(game: Pick<Game, 'players' | 'events' | 'chipConfig' | 'discrepancyResolution'>): FinalBalances {
   const summaries = summarizePlayers(game)
-  const { moneyInPlayCents } = computeStats(game, summaries)
+  const { moneyInPlayCents, totalInvestedCents } = computeStats(game, summaries)
 
   const finalsById = new Map<string, number>()
   for (const ev of game.events) {
@@ -105,21 +113,29 @@ export function finalBalances(game: Pick<Game, 'players' | 'events' | 'chipConfi
       finalsById.set(ev.playerId, (finalsById.get(ev.playerId) ?? 0) + ev.amountCents)
     }
   }
-  const finals = [...finalsById].map(([playerId, cents]) => ({ playerId, cents }))
-  const diff = discrepancyCents(finals, moneyInPlayCents)
+  let counted: FinalStack[] = [...finalsById].map(([playerId, cents]) => ({ playerId, cents }))
+  let targetCents = moneyInPlayCents
+  if (counted.length === 0) {
+    counted = [...summaries.values()]
+      .filter((s) => s.status === 'left')
+      .map((s) => ({ playerId: s.playerId, cents: s.cashedOutCents }))
+    targetCents = totalInvestedCents
+  }
+  const diff = discrepancyCents(counted, targetCents)
 
-  let resolved: FinalStack[] | null = finals
+  let resolved: FinalStack[] | null = counted
   if (diff !== 0) {
     resolved = game.discrepancyResolution
-      ? resolveDiscrepancy(finals, moneyInPlayCents, game.discrepancyResolution)
+      ? resolveDiscrepancy(counted, targetCents, game.discrepancyResolution)
       : null
   }
-  if (!resolved) return { balances: new Map(), discrepancyCents: diff, resolved: false }
+  if (!resolved) return { balances: new Map(), stacks: [], discrepancyCents: diff, resolved: false }
 
-  const correction = new Map(resolved.map((f) => [f.playerId, f.cents - (finalsById.get(f.playerId) ?? 0)]))
+  const before = new Map(counted.map((f) => [f.playerId, f.cents]))
+  const correction = new Map(resolved.map((f) => [f.playerId, f.cents - before.get(f.playerId)!]))
   const balances = new Map<string, number>()
   for (const s of summaries.values()) {
     balances.set(s.playerId, s.balanceCents + (correction.get(s.playerId) ?? 0))
   }
-  return { balances, discrepancyCents: diff, resolved: true }
+  return { balances, stacks: resolved, discrepancyCents: diff, resolved: true }
 }

@@ -12,10 +12,11 @@
 // L'instance de l'app et le hook Preact sont dans useGame.ts.
 import { createStore } from 'zustand/vanilla'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
-import { summarizePlayers } from '../lib/derive'
+import { summarizePlayers, type PlayerSummary } from '../lib/derive'
 import { finalBalances, type FinalStack } from '../lib/discrepancy'
 import { MAX_SEATED, MIN_PLAYERS_TO_START, nextPlayerColor } from '../lib/players'
 import { settle, type Transfer } from '../lib/settlement'
+import { fraction } from '../lib/units'
 import type { ChipConfig, DiscrepancyResolution, Game, GameEvent, GameEventType, Player, Unit } from '../lib/types'
 
 export const STORAGE_KEY = 'pokervice'
@@ -60,6 +61,8 @@ export interface UndoEntry {
   /** Heure (ms) jusqu'à laquelle `undo()` est accepté. */
   until: number
   prev: PersistedState
+  /** Unité juste après l'action : si elle a changé depuis, c'est un choix d'affichage à garder. */
+  unitAfter: Unit
 }
 
 export interface AddPlayerOptions {
@@ -124,10 +127,12 @@ function isCents(v: number, allowZero: boolean): boolean {
 
 function isValidChipConfig(cfg: ChipConfig): boolean {
   const { num, den } = cfg.centsPerPoint
+  if (!Number.isSafeInteger(num) || num <= 0 || !Number.isSafeInteger(den) || den <= 0) return false
+  // La fraction doit déjà être réduite (cf. type Fraction).
+  if (fraction(num, den).den !== den) return false
   return (
-    Number.isSafeInteger(num) && num > 0 && Number.isSafeInteger(den) && den > 0 &&
     Number.isSafeInteger(cfg.bbPoints) && cfg.bbPoints > 0 &&
-    Number.isSafeInteger(cfg.sbPoints) && cfg.sbPoints > 0
+    Number.isSafeInteger(cfg.sbPoints) && cfg.sbPoints > 0 && cfg.sbPoints <= cfg.bbPoints
   )
 }
 
@@ -135,14 +140,19 @@ function event(type: GameEventType, playerId: string, amountCents: number, at: n
   return { id: makeId(), at, type, playerId, amountCents }
 }
 
-function seatedCount(game: Game): number {
+function seatedCount(summaries: Map<string, PlayerSummary>): number {
   let n = 0
-  for (const s of summarizePlayers(game).values()) if (s.status === 'seated') n += 1
+  for (const s of summaries.values()) if (s.status === 'seated') n += 1
   return n
 }
 
 function statusOf(game: Game, playerId: string) {
   return summarizePlayers(game).get(playerId)?.status
+}
+
+/** Un historique modifié ne doit pas faire dépasser la limite de joueurs assis. */
+function withinSeatLimit(events: GameEvent[], game: Game): boolean {
+  return seatedCount(summarizePlayers({ players: game.players, events })) <= MAX_SEATED
 }
 
 // ——— Store ———
@@ -161,7 +171,13 @@ export function createGameStore(storage: StateStorage) {
         const commit = (action: UndoableAction, next: Partial<PersistedState>, playerId?: string) => {
           set((s) => ({
             ...next,
-            undoable: { action, playerId, until: Date.now() + UNDO_MS, prev: { game: s.game, lastRecap: s.lastRecap, unit: s.unit } },
+            undoable: {
+              action,
+              playerId,
+              until: Date.now() + UNDO_MS,
+              prev: { game: s.game, lastRecap: s.lastRecap, unit: s.unit },
+              unitAfter: next.unit ?? s.unit,
+            },
           }))
         }
 
@@ -193,7 +209,7 @@ export function createGameStore(storage: StateStorage) {
           addPlayer(name, opts = {}) {
             const game = openGame()
             const trimmed = name.trim()
-            if (!game || !trimmed || seatedCount(game) >= MAX_SEATED) return null
+            if (!game || !trimmed || opts.color === '' || seatedCount(summarizePlayers(game)) >= MAX_SEATED) return null
             const buyIn = opts.buyInCents ?? game.defaultBuyInCents
             if (game.status === 'running' && !isCents(buyIn, false)) return null
             const player: Player = {
@@ -272,8 +288,9 @@ export function createGameStore(storage: StateStorage) {
 
           return(playerId, buyInCents) {
             const game = openGame()
-            if (game?.status !== 'running' || !isCents(buyInCents, false) || statusOf(game, playerId) !== 'left') return false
-            if (seatedCount(game) >= MAX_SEATED) return false
+            if (game?.status !== 'running' || !isCents(buyInCents, false)) return false
+            const summaries = summarizePlayers(game)
+            if (summaries.get(playerId)?.status !== 'left' || seatedCount(summaries) >= MAX_SEATED) return false
             appendEvent('return', event('return', playerId, buyInCents, Date.now()))
             return true
           },
@@ -285,8 +302,11 @@ export function createGameStore(storage: StateStorage) {
             const amountCents = patch.amountCents ?? ev.amountCents
             const at = patch.at ?? ev.at
             if (!isCents(amountCents, ev.type === 'leave') || !Number.isSafeInteger(at)) return false
+            // Ni avant le début ni dans le futur : un départ « à venir » primerait sur tout retour réel.
+            if (patch.at !== undefined && (at < game.startedAt! || at > Date.now())) return false
             // Tri stable par heure : à heure égale, l'ordre de saisie est conservé.
             const events = game.events.map((e) => (e.id === eventId ? { ...e, amountCents, at } : e)).sort((a, b) => a.at - b.at)
+            if (patch.at !== undefined && !withinSeatLimit(events, game)) return false
             commit('editEvent', { game: { ...game, events } }, ev.playerId)
             return true
           },
@@ -295,7 +315,9 @@ export function createGameStore(storage: StateStorage) {
             const game = openGame()
             const ev = game?.events.find((e) => e.id === eventId)
             if (game?.status !== 'running' || !ev) return false
-            commit('deleteEvent', { game: { ...game, events: game.events.filter((e) => e.id !== eventId) } }, ev.playerId)
+            const events = game.events.filter((e) => e.id !== eventId)
+            if (ev.type === 'leave' && !withinSeatLimit(events, game)) return false
+            commit('deleteEvent', { game: { ...game, events } }, ev.playerId)
             return true
           },
 
@@ -306,6 +328,7 @@ export function createGameStore(storage: StateStorage) {
             const finalIds = new Set(finals.map((f) => f.playerId))
             if (finalIds.size !== finals.length || finalIds.size !== seated.length || !seated.every((id) => finalIds.has(id))) return false
             if (!finals.every((f) => isCents(f.cents, true))) return false
+            if (resolution && resolution.type !== 'prorata' && resolution.type !== 'assign') return false
 
             const now = Date.now()
             const draft: Game = {
@@ -313,14 +336,13 @@ export function createGameStore(storage: StateStorage) {
               status: 'finished',
               endedAt: now,
               events: [...game.events, ...finals.map((f) => event('final', f.playerId, f.cents, now))],
-              discrepancyResolution: undefined,
+              discrepancyResolution: resolution && { ...resolution },
             }
-            let fb = finalBalances(draft)
-            if (!fb.resolved && resolution) {
-              draft.discrepancyResolution = resolution
-              fb = finalBalances(draft)
-            }
-            if (!fb.resolved) return false
+            // Un seul calcul : sans écart, la résolution est ignorée (puis retirée) ; avec un écart,
+            // un joueur inconnu ou non compté donne `resolved: false`.
+            const fb = finalBalances(draft)
+            if (!fb.resolved || fb.stacks.some((f) => f.cents < 0)) return false
+            if (fb.discrepancyCents === 0) draft.discrepancyResolution = undefined
             const transfers = settle([...fb.balances].map(([playerId, balanceCents]) => ({ playerId, balanceCents })))
             commit('finish', { lastRecap: { game: draft, transfers }, game: blankGame(game.defaultBuyInCents, game.wakeLock, now) })
             return true
@@ -350,10 +372,18 @@ export function createGameStore(storage: StateStorage) {
               if (u) set({ undoable: null })
               return false
             }
-            // L'écran allumé est une préférence, pas une action : on ne la remonte pas dans le temps.
+            // L'écran allumé et l'unité choisie après l'action sont des préférences, pas des actions :
+            // on ne les remonte pas dans le temps (sauf unité impossible sans configuration jetons).
             set((s) => {
-              const { game } = u.prev
-              return { ...u.prev, game: game.wakeLock === s.game.wakeLock ? game : { ...game, wakeLock: s.game.wakeLock }, undoable: null }
+              const { game, lastRecap } = u.prev
+              let unit = s.unit === u.unitAfter ? u.prev.unit : s.unit
+              if (unit !== 'eur' && !(lastRecap ? lastRecap.game.chipConfig : game.chipConfig)) unit = 'eur'
+              return {
+                ...u.prev,
+                game: game.wakeLock === s.game.wakeLock ? game : { ...game, wakeLock: s.game.wakeLock },
+                unit,
+                undoable: null,
+              }
             })
             return true
           },

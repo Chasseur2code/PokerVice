@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StateStorage } from 'zustand/middleware'
 import { computeStats, summarizePlayers } from '../lib/derive'
 import type { ChipConfig } from '../lib/types'
+import { MAX_SEATED } from '../lib/players'
 import { createGameStore, STORAGE_KEY, UNDO_MS, type GameStore } from './game'
 
 function memoryStorage(): StateStorage & { data: Map<string, string> } {
@@ -53,6 +54,10 @@ describe('préparation', () => {
     expect(s().game.defaultBuyInCents).toBe(2000)
     expect(s().lastRecap).toBeNull()
     expect(s().unit).toBe('eur')
+  })
+
+  it('refuse une couleur vide', () => {
+    expect(s().addPlayer('Léa', { color: '' })).toBeNull()
   })
 
   it('ajoute des joueurs avec couleurs et places successives, sans événement', () => {
@@ -128,6 +133,9 @@ describe('configuration jetons', () => {
   it('refuse une configuration invalide', () => {
     expect(s().setChipConfig({ ...cfg, centsPerPoint: { num: 0, den: 1 } })).toBe(false)
     expect(s().setChipConfig({ ...cfg, bbPoints: 1.5 })).toBe(false)
+    expect(s().setChipConfig({ ...cfg, centsPerPoint: { num: 2, den: 10 } })).toBe(false) // non réduite
+    expect(s().setChipConfig({ ...cfg, sbPoints: 200 })).toBe(false) // SB > BB
+    expect(s().setChipConfig({ ...cfg, sbPoints: 100 })).toBe(true)
   })
 
   it('les unités Pts et BB exigent une configuration', () => {
@@ -247,9 +255,72 @@ describe('partie complète', () => {
     s().start()
     later(60_000)
     s().rebuy(idOf('Hugo'), 2000)
+    later(60_000)
+    s().rebuy(idOf('Julie'), 2000)
     const rebuy = s().game.events.at(-1)!
-    expect(s().editEvent(rebuy.id, { at: T0 - 1 })).toBe(true)
-    expect(s().game.events[0]!.id).toBe(rebuy.id)
+    expect(s().editEvent(rebuy.id, { at: T0 + 30_000 })).toBe(true)
+    expect(s().game.events[3]!.id).toBe(rebuy.id)
+  })
+
+  it('refuse une heure avant le début ou dans le futur', () => {
+    setupThree()
+    s().start()
+    later(60_000)
+    s().leave(idOf('Hugo'), 2000)
+    const leave = s().game.events.at(-1)!
+    expect(s().editEvent(leave.id, { at: T0 - 1 })).toBe(false)
+    expect(s().editEvent(leave.id, { at: Date.now() + 3_600_000 })).toBe(false)
+    expect(s().editEvent(leave.id, { at: T0 })).toBe(true)
+    later(60_000)
+    expect(s().return(idOf('Hugo'), 2000)).toBe(true)
+    expect(summarizePlayers(s().game).get(idOf('Hugo'))?.status).toBe('seated')
+  })
+
+  it('ne dépasse pas 10 joueurs assis en modifiant l’historique', () => {
+    for (let i = 0; i < MAX_SEATED; i++) s().addPlayer(`J${i}`)
+    s().start()
+    later(60_000)
+    s().leave(idOf('J0'), 2000)
+    later(60_000)
+    s().addPlayer('Onzième')
+    later(60_000)
+    s().return(idOf('J0'), 2000) // refusé : table pleine
+    const leave = s().game.events.find((e) => e.type === 'leave')!
+    expect(s().deleteEvent(leave.id)).toBe(false)
+    expect(computeStats(s().game).seatedCount).toBe(MAX_SEATED)
+  })
+
+  it('termine même si tout le monde est parti avec un écart (prorata ou imputation)', () => {
+    s().addPlayer('A')
+    s().addPlayer('B')
+    const [a, b] = ['A', 'B'].map(idOf) as [string, string]
+    s().start()
+    later()
+    s().leave(a, 2500)
+    s().leave(b, 1400) // 39 € rendus pour 40 € investis
+    expect(s().finish([])).toBe(false)
+    expect(s().finish([], { type: 'assign', playerId: b })).toBe(true)
+    expect(s().lastRecap!.transfers).toEqual([{ from: b, to: a, amountCents: 500 }])
+    expect(s().undo()).toBe(true)
+    expect(s().finish([], { type: 'prorata' })).toBe(true)
+    const paid = s().lastRecap!.transfers.reduce((x, tr) => x + tr.amountCents, 0)
+    expect(paid).toBeGreaterThan(0)
+  })
+
+  it('refuse une imputation invalide ou qui rend un stack négatif', () => {
+    setupThree()
+    s().start()
+    const [h, j, l] = ['Hugo', 'Julie', 'Léo'].map(idOf) as [string, string, string]
+    const finals = [
+      { playerId: h, cents: 100 },
+      { playerId: j, cents: 2000 },
+      { playerId: l, cents: 4400 }, // 5 € en trop
+    ]
+    expect(s().finish(finals, { type: 'assign', playerId: h })).toBe(false) // 1 € − 5 € < 0
+    expect(s().finish(finals, { type: 'assign', playerId: 'inconnu' })).toBe(false)
+    expect(s().finish(finals, { type: 'assign' })).toBe(false)
+    expect(s().finish(finals, { type: 'autre' as 'prorata' })).toBe(false)
+    expect(s().finish(finals, { type: 'assign', playerId: l })).toBe(true)
   })
 })
 
@@ -307,6 +378,28 @@ describe('annulation', () => {
     s().rebuy(idOf('Hugo'), 2000)
     expect(s().rebuy(idOf('Hugo'), -1)).toBe(false)
     expect(s().undoable?.action).toBe('rebuy')
+  })
+
+  it('garde l’unité choisie après l’action annulée', () => {
+    setupThree()
+    s().setChipConfig(cfg)
+    s().start()
+    s().rebuy(idOf('Hugo'), 2000)
+    s().setUnit('bb')
+    expect(s().undo()).toBe(true)
+    expect(s().unit).toBe('bb')
+    expect(computeStats(s().game).rebuyCount).toBe(0)
+  })
+
+  it('revient en € si l’état restauré n’a pas de configuration jetons', () => {
+    setupThree()
+    s().setChipConfig(cfg)
+    s().setUnit('pts')
+    s().newGame()
+    s().addPlayer('Hugo')
+    // L'annulation porte sur l'ajout : la table vierge n'a pas de configuration.
+    expect(s().undo()).toBe(true)
+    expect(s().unit).toBe('eur')
   })
 
   it('ne remonte pas l’interrupteur écran allumé', () => {
