@@ -160,9 +160,32 @@ describe('proposeChips — cas impossibles', () => {
     expect(r.failure.suggestions).toEqual({})
   })
 
-  it('rejette une saisie non entière', () => {
+  it('message : accords et nombres au format français ; pas de suggestion de profondeur inutile', () => {
+    const r = proposeChips(input([100, 100, 5], { maxPlayers: 10, rebuysPerPlayer: 0 }))
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.failure.message).toContain('(10 joueurs × 1 stack)')
+    expect(r.failure.suggestions.depthBB).toBeUndefined()
+    const big = proposeChips(input([1500, 1000, 1000], { maxPlayers: 10, rebuysPerPlayer: 19 }))
+    if (big.ok) throw new Error('attendu impossible')
+    expect(big.failure.message).toContain(`il en faut ${new Intl.NumberFormat('fr-FR').format(1600)}`)
+  })
+
+  it("l'échec reste rapide (10 joueurs, 3 recaves, 200 BB, une couleur en manque)", () => {
+    const t = performance.now()
+    const r = proposeChips(input([400, 400, 400, 39, 39], { maxPlayers: 10, rebuysPerPlayer: 3, depthBB: 200 }))
+    expect(r.ok).toBe(false)
+    expect(performance.now() - t).toBeLessThan(500)
+  })
+
+  it('rejette une saisie non entière, hors bornes ou des couleurs en double', () => {
     expect(() => proposeChips(input([100, 100, 100], { depthBB: 99.5 }))).toThrow(RangeError)
     expect(() => proposeChips(input([100, 100, 100], { maxPlayers: 1 }))).toThrow(RangeError)
+    expect(() => proposeChips(input([100, 100, 100], { depthBB: 40 }))).toThrow(RangeError)
+    expect(() => proposeChips(input([100, 100, 100], { depthBB: 210 }))).toThrow(RangeError)
+    const dup = stock(150, 150, 100, 50)
+    dup[3]!.id = dup[0]!.id
+    expect(() => proposeChips({ ...input([]), stock: dup })).toThrow(RangeError)
   })
 })
 
@@ -211,6 +234,47 @@ describe('summarizeChips — édition manuelle', () => {
     const bad = colors()
     bad[0]!.perPlayer = -1
     expect(summarizeChips(bad, 2000, 6).issues).toContainEqual({ kind: 'invalid', colorId: 'w' })
+  })
+
+  it('un doublon de valeur est signalé une seule fois', () => {
+    const c = colors()
+    c[1]!.valuePoints = 50
+    c[3]!.valuePoints = 50
+    expect(summarizeChips(c, 2000, 6).issues.filter((i) => i.kind === 'duplicateValue')).toEqual([
+      { kind: 'duplicateValue', valuePoints: 50 },
+    ])
+  })
+
+  it('profondeur arrondie au plus proche, comme le reste de l’app', () => {
+    // Stack 1 999 pts, BB 20 : 99,95 BB → 100 BB (et non 99,9).
+    const s = summarizeChips(
+      [
+        { id: 'a', name: 'A', hex: '#fff', valuePoints: 10, perPlayer: 10, totalQty: 200 },
+        { id: 'b', name: 'B', hex: '#fff', valuePoints: 1899, perPlayer: 1, totalQty: 200 },
+      ],
+      2000,
+      6,
+    )
+    expect(s.stackPoints).toBe(1999)
+    expect(s.stackBBTenths).toBe(1000)
+  })
+
+  it('saisies extrêmes : signalées, sans exception', () => {
+    const huge = colors()
+    huge[0]!.valuePoints = 1e15
+    expect(summarizeChips(huge, 2000, 6).issues).toContainEqual({ kind: 'invalid', colorId: 'w' })
+    const big = colors().map((c) => (c.perPlayer ? { ...c, valuePoints: 1e9, perPlayer: 1e9 } : c))
+    const s = summarizeChips(big, 2000, 1)
+    expect(s.issues).toContainEqual({ kind: 'tooLarge' })
+    expect(s.centsPerPoint).toBeNull()
+    expect(() => toChipConfig(big, 2000, 1)).toThrow(RangeError)
+  })
+
+  it('buy-in nul ou nombre de joueurs invalide : signalé, et pas de configuration', () => {
+    expect(summarizeChips(colors(), 0, 6)).toMatchObject({ centsPerPoint: null })
+    expect(summarizeChips(colors(), 0, 6).issues).toContainEqual({ kind: 'invalidSettings' })
+    expect(summarizeChips(colors(), 2000, 1.5).issues).toContainEqual({ kind: 'invalidSettings' })
+    expect(() => toChipConfig(colors(), 0, 6)).toThrow(RangeError)
   })
 
   it('toChipConfig garde les couleurs utilisées, triées par valeur, avec une conversion exacte', () => {

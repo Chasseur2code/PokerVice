@@ -8,7 +8,7 @@
 //   - pour chaque suite, une programmation dynamique sur le montant cumulé trouve la composition
 //     exacte du stack qui minimise une pénalité séparable couleur par couleur.
 // Tout est calculé en « unités » = multiples de la SB, puis converti en points.
-import { divFloor } from './money'
+import { divFloor, divRound } from './money'
 import { fraction } from './units'
 import type { ChipColor, ChipConfig, Fraction } from './types'
 
@@ -50,6 +50,10 @@ export type ChipIssue =
   | { kind: 'invalid'; colorId: string }
   | { kind: 'stockExceeded'; colorId: string; needed: number; available: number }
   | { kind: 'duplicateValue'; valuePoints: number }
+  /** Buy-in ou nombre de joueurs invalide. */
+  | { kind: 'invalidSettings' }
+  /** Stack trop grand pour un calcul entier exact. */
+  | { kind: 'tooLarge' }
 
 export type ChipBlocker =
   | { kind: 'tooFewColors' }
@@ -93,9 +97,19 @@ const W_BIG = 25 // part du stack × log2(valeur) : peu de valeur dans les gros 
 /** Au-delà, une pile d'une seule couleur devient encombrante (même si le stock le permet). */
 export const MAX_PER_COLOR = 20
 
-/** Suites de valeurs (en unités de SB) de longueur k, chacune multiple de la précédente, rapport 2 à 5. */
-function sequences(k: number, maxUnits: number): { sb: number; units: number[] }[] {
-  const out: { sb: number; units: number[] }[] = []
+type Sequence = { sb: number; units: number[] }
+const sequenceCache = new Map<string, readonly Sequence[]>()
+
+/** Suites de valeurs (en unités de SB) de longueur k, chacune multiple de la précédente, rapport 2 à 5. Mises en cache. */
+function sequences(k: number, maxUnits: number): readonly Sequence[] {
+  const key = `${k},${maxUnits}`
+  let cached = sequenceCache.get(key)
+  if (!cached) sequenceCache.set(key, (cached = buildSequences(k, maxUnits)))
+  return cached
+}
+
+function buildSequences(k: number, maxUnits: number): Sequence[] {
+  const out: Sequence[] = []
   const seen = new Set<string>()
   for (const sb of SB_CANDIDATES) {
     const walk = (seq: number[]) => {
@@ -178,8 +192,8 @@ function bestComposition(units: number[], caps: number[], target: number): { pen
   return { penalty: dp[target]!, counts }
 }
 
-function assertInt(n: number, label: string, min: number): void {
-  if (!Number.isSafeInteger(n) || n < min) throw new RangeError(`${label} invalide (reçu ${n})`)
+function assertInt(n: number, label: string, min: number, max = Number.MAX_SAFE_INTEGER): void {
+  if (!Number.isSafeInteger(n) || n < min || n > max) throw new RangeError(`${label} invalide (reçu ${n})`)
 }
 
 /** Couleurs non vides triées par quantité décroissante (à égalité, ordre de saisie). */
@@ -213,8 +227,13 @@ function validateInput(input: ChipAssistantInput): void {
   assertInt(input.buyInCents, 'buy-in', 1)
   assertInt(input.maxPlayers, 'nombre de joueurs', 2)
   assertInt(input.rebuysPerPlayer, 'recaves', 0)
-  assertInt(input.depthBB, 'profondeur', 1)
-  for (const s of input.stock) assertInt(s.qty, `quantité ${s.name}`, 0)
+  assertInt(input.depthBB, 'profondeur', DEPTH_MIN, DEPTH_MAX)
+  const ids = new Set<string>()
+  for (const s of input.stock) {
+    assertInt(s.qty, `quantité ${s.name}`, 0)
+    if (ids.has(s.id)) throw new RangeError(`couleur en double (id ${s.id})`)
+    ids.add(s.id)
+  }
 }
 
 /** Meilleure répartition (SPEC §5.3), ou explication de l'échec (SPEC §5.4). */
@@ -256,49 +275,62 @@ function diagnose(input: ChipAssistantInput): ChipFailure {
   const suggestions: ChipFailure['suggestions'] = {}
   if (blocker.kind !== 'tooFewColors') {
     const feasible = (patch: Partial<ChipAssistantInput>) => search({ ...input, ...patch }, true) !== null
-    for (let p = input.maxPlayers - 1; p >= 2; p--) {
-      if (feasible({ maxPlayers: p })) {
-        suggestions.maxPlayers = p
-        break
-      }
-    }
-    for (let r = input.rebuysPerPlayer - 1; r >= 0; r--) {
-      if (feasible({ rebuysPerPlayer: r })) {
-        suggestions.rebuysPerPlayer = r
-        break
-      }
-    }
-    for (let d = Math.ceil(input.depthBB / 10) * 10 - 10; d >= DEPTH_MIN; d -= 10) {
-      if (feasible({ depthBB: d })) {
-        suggestions.depthBB = d
-        break
+    // Moins de stacks = plafonds plus hauts : la faisabilité est monotone en joueurs et en recaves.
+    const p = largestFeasible(2, input.maxPlayers - 1, (p) => feasible({ maxPlayers: p }))
+    if (p !== null) suggestions.maxPlayers = p
+    const r = largestFeasible(0, input.rebuysPerPlayer - 1, (r) => feasible({ rebuysPerPlayer: r }))
+    if (r !== null) suggestions.rebuysPerPlayer = r
+    // Les plafonds ne dépendent pas de la profondeur : la baisser ne lève qu'un blocage de composition
+    // (non monotone, d'où le parcours linéaire).
+    if (blocker.kind === 'composition') {
+      for (let d = Math.ceil(input.depthBB / 10) * 10 - 10; d >= DEPTH_MIN; d -= 10) {
+        if (feasible({ depthBB: d })) {
+          suggestions.depthBB = d
+          break
+        }
       }
     }
   }
   return { blocker, suggestions, message: failureMessage(input, blocker, suggestions) }
 }
 
+/** Plus grande valeur de [lo, hi] qui vérifie `ok`, supposé vrai jusqu'à un seuil puis faux ; `null` si aucune. */
+function largestFeasible(lo: number, hi: number, ok: (n: number) => boolean): number | null {
+  let best: number | null = null
+  while (lo <= hi) {
+    const mid = lo + Math.floor((hi - lo) / 2)
+    if (ok(mid)) {
+      best = mid
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  return best
+}
+
 const intFormatter = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 })
 const plural = (n: number, word: string) => `${intFormatter.format(n)} ${word}${n > 1 ? 's' : ''}`
 
 function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailure['suggestions']): string {
-  const stacks = `${plural(input.maxPlayers, 'joueur')} × ${1 + input.rebuysPerPlayer} stacks`
+  const stacks = `${plural(input.maxPlayers, 'joueur')} × ${plural(1 + input.rebuysPerPlayer, 'stack')}`
+  const n = (x: number) => intFormatter.format(x)
   let why: string
   switch (b.kind) {
     case 'tooFewColors':
       return `Il faut au moins ${MIN_COLORS_USED} couleurs de jetons pour composer un stack.`
     case 'stock':
-      why = `Pas assez de jetons ${b.colorName} : il en faut au moins ${b.needed} (${stacks}), il y en a ${b.available}.`
+      why = `Pas assez de jetons ${b.colorName} : il en faut au moins ${n(b.needed)} (${stacks}), il y en a ${n(b.available)}.`
       break
     case 'smallChips':
-      why = `Pas assez de petits jetons ${b.colorName} : pour en donner ${MIN_SMALL_CHIPS} à chacun, il en faut ${b.needed} (${stacks}), il y en a ${b.available}.`
+      why = `Pas assez de petits jetons ${b.colorName} : pour en donner ${MIN_SMALL_CHIPS} à chacun, il en faut ${n(b.needed)} (${stacks}), il y en a ${n(b.available)}.`
       break
     case 'composition':
       why = `Impossible de composer un stack de ${input.depthBB} BB avec ces quantités tout en gardant de quoi faire la monnaie.`
       break
   }
   const fixes: string[] = []
-  if (s.maxPlayers !== undefined) fixes.push(`prévoir ${s.maxPlayers} joueurs au plus`)
+  if (s.maxPlayers !== undefined) fixes.push(`prévoir ${n(s.maxPlayers)} joueurs au plus`)
   if (s.rebuysPerPlayer !== undefined) fixes.push(`prévoir ${plural(s.rebuysPerPlayer, 'recave')} par joueur`)
   if (s.depthBB !== undefined) fixes.push(`descendre à ${s.depthBB} BB`)
   if (fixes.length === 0) return `${why} Ajouter des jetons ou des couleurs.`
@@ -311,21 +343,28 @@ function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailur
  */
 export function summarizeChips(colors: readonly ChipColor[], buyInCents: number, maxPlayers: number): ChipSummary {
   const issues: ChipIssue[] = []
-  const valid = (c: ChipColor) =>
-    [c.valuePoints, c.perPlayer, c.totalQty].every((n) => Number.isSafeInteger(n) && n >= 0)
-  for (const c of colors) if (!valid(c)) issues.push({ kind: 'invalid', colorId: c.id })
-  const used = colors.filter((c) => valid(c) && c.valuePoints > 0 && c.perPlayer > 0)
+  const settingsOk = [buyInCents, maxPlayers].every((n) => Number.isSafeInteger(n) && n >= 1)
+  if (!settingsOk) {
+    issues.push({ kind: 'invalidSettings' })
+    maxPlayers = 0
+  }
+  for (const c of colors) if (!isValidColor(c)) issues.push({ kind: 'invalid', colorId: c.id })
+  const used = colors.filter(isUsedColor)
   if (used.length === 0) issues.push({ kind: 'empty' })
 
   const seen = new Set<number>()
+  const reported = new Set<number>()
   for (const c of used) {
-    if (seen.has(c.valuePoints)) issues.push({ kind: 'duplicateValue', valuePoints: c.valuePoints })
+    if (seen.has(c.valuePoints) && !reported.has(c.valuePoints)) {
+      issues.push({ kind: 'duplicateValue', valuePoints: c.valuePoints })
+      reported.add(c.valuePoints)
+    }
     seen.add(c.valuePoints)
   }
 
   let rebuysPossible = Infinity
   const rows = colors.map((c) => {
-    if (!valid(c)) return { id: c.id, reserve: 0, rebuys: null }
+    if (!isValidColor(c)) return { id: c.id, reserve: 0, rebuys: null }
     const inPlay = used.includes(c) ? c.perPlayer * maxPlayers : 0
     const reserve = c.totalQty - inPlay
     if (reserve < 0) issues.push({ kind: 'stockExceeded', colorId: c.id, needed: inPlay, available: c.totalQty })
@@ -338,17 +377,33 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
   const sbPoints = used.length ? Math.min(...used.map((c) => c.valuePoints)) : 0
   const bbPoints = 2 * sbPoints
   const stackPoints = used.reduce((s, c) => s + c.valuePoints * c.perPlayer, 0)
+  // stackPoints × 10 entier sûr ⇒ stackPoints aussi.
+  const sizeOk = Number.isSafeInteger(stackPoints * 10)
+  if (!sizeOk) issues.push({ kind: 'tooLarge' })
   return {
     sbPoints,
     bbPoints,
     stackPoints,
-    stackBBTenths: bbPoints ? divFloor(stackPoints * 10, bbPoints) : 0,
-    centsPerPoint: stackPoints > 0 ? fraction(buyInCents, stackPoints) : null,
+    // Arrondi au plus proche, comme centsToBBTenths, pour afficher la même profondeur partout.
+    stackBBTenths: bbPoints && sizeOk ? divRound(stackPoints * 10, bbPoints) : 0,
+    centsPerPoint: stackPoints > 0 && sizeOk && settingsOk ? fraction(buyInCents, stackPoints) : null,
     chipsPerPlayer: used.reduce((s, c) => s + c.perPlayer, 0),
     colors: rows,
     rebuysPossible: rebuysPossible === Infinity ? 0 : rebuysPossible,
     issues,
   }
+}
+
+/** Plafond des champs d'une couleur : valeur × nombre et nombre × joueurs restent des entiers sûrs. */
+const MAX_COLOR_FIELD = 1e9
+
+function isValidColor(c: ChipColor): boolean {
+  return [c.valuePoints, c.perPlayer, c.totalQty].every((n) => Number.isSafeInteger(n) && n >= 0 && n <= MAX_COLOR_FIELD)
+}
+
+/** Une couleur est utilisée si elle est valide, avec une valeur et un nombre par joueur > 0. */
+function isUsedColor(c: ChipColor): boolean {
+  return isValidColor(c) && c.valuePoints > 0 && c.perPlayer > 0
 }
 
 /** Configuration jetons issue de l'assistant (après validation) ; seules les couleurs utilisées sont gardées. */
@@ -361,8 +416,7 @@ export function toChipConfig(colors: readonly ChipColor[], buyInCents: number, m
     bbPoints: s.bbPoints,
     sbPoints: s.sbPoints,
     colors: colors
-      .filter((c) => c.valuePoints > 0 && c.perPlayer > 0)
-      .slice()
+      .filter(isUsedColor)
       .sort((a, b) => a.valuePoints - b.valuePoints),
   }
 }
