@@ -49,11 +49,11 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - `derive.ts` : investi, balance, argent en jeu, tapis moyen (€ et BB), nombre de recaves, joueurs assis / partis, durée à partir de `startedAt`. Tout est calculé à partir des `events`.
 - **Vérif** : tests Vitest couvrant chaque formule du §2.3, y compris un joueur parti puis revenu.
 
-### [ ] Étape 2 — Règlement et écart (`lib/`)
+### [x] Étape 2 — Règlement et écart (`lib/`)
 - `settlement.ts` : **nombre minimal exact de virements**. Programmation dynamique sur masques de bits : `dp[mask]` = nombre maximal de sous-groupes de somme nulle. Nombre de virements = n − nombre de groupes. On reconstruit ensuite les virements de chaque groupe (le plus gros débiteur paie le plus gros créancier). L'ordre est déterministe (tri par montant puis par id). Les balances nulles sont exclues ; au plus 2^20 états, ce qui est négligeable.
 - Option « Arrondir à l'euro » : arrondir chaque virement, puis corriger le résidu sur le plus gros virement pour garder une somme nulle.
 - `discrepancy.ts` : prorata des stacks finaux avec la méthode du plus fort reste ; « imputer à » un joueur ; message « Il manque X points (Y €) » ou « en trop ».
-- **Vérif** : tests sur des cas où **le glouton échoue** (par ex. +5,+5,−5,−5,+3,−3 avec un ordre piège), somme des balances = 0 au centime (critères 4 et 5), déterminisme.
+- **Vérif** : tests sur des cas où **le glouton échoue** (par ex. +8,+7,−4,−4,−7 : le glouton fait 4 virements, l'optimum 3), somme des balances = 0 au centime (critères 4 et 5), déterminisme.
 
 ### [ ] Étape 3 — Assistant de répartition des jetons (`lib/chips.ts`)
 - Entrées et règles de SPEC §5.1 à 5.3. Recherche exhaustive :
