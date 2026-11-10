@@ -11,7 +11,7 @@ Documents de référence (à lire avant toute tâche) :
 - Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md`.
 
 ## État
-La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étape 0 faite (squelette, page « Hello » temporaire dans `src/ui/App.tsx`, `src/lib/smoke.test.ts` à supprimer quand `lib/` aura de vrais tests). Prochaine étape : **1 (modèle et calculs de base)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
+La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étapes 0 et 1 faites (`lib/` : `types`, `money`, `units`, `derive` + tests ; page « Hello » temporaire dans `src/ui/App.tsx`). Prochaine étape : **2 (règlement et écart)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
 
 ## Commandes
 - `npm run dev` (localhost:5173), `npm run dev:lan` (téléphone en wifi), `npm run build` (`tsc -b` puis `vite build`), `npm run preview`
@@ -21,6 +21,7 @@ La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : l
 ## Pièges et conventions
 - Node 26 ARM64 dans `C:\Program Files\nodejs`. Dans le shell Bash de Claude, il peut manquer au PATH : préfixer `export PATH="/c/Program Files/nodejs:$PATH" &&`.
 - Tokens de DESIGN §2 dans `@theme` de `src/styles/index.css` : `--color-x` → `bg-x`/`text-x`, `--radius-card` → `rounded-card`, `--shadow-card` → `shadow-card`, `--text-hero` → `text-hero`, `font-display` = Fraunces. Feutre/bois via `var(--felt)` etc. dans `:root`. Classe `num` = `tabular-nums`.
+- Statut assis/parti **dérivé** du dernier `leave`/`return` (par `at`), pas stocké dans `Player`. Arrondis entiers via `divRound`/`divFloor` de `money.ts` (jamais `Math.round(a/b)`).
 - Preact : attribut `class` (pas `className`) ; `react` est aliasé vers `preact/compat` dans `tsconfig.app.json`.
 - `base` de Vite vient de `BASE_PATH` (fourni par `.github/workflows/deploy.yml` = `/<nom-du-dépôt>/`), `/` en local.
 

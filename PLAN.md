@@ -42,7 +42,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - Créer `Vault/Perso/02-Projets/pokervice/synthese.md` (décisions de stack ci-dessus).
 - **Vérif** : `npm run dev` affiche la page, avec les bonnes polices et la couleur de fond `#F5F1E9` ; le site GitHub Pages est en ligne.
 
-### [ ] Étape 1 — Modèle et calculs de base (`lib/`)
+### [x] Étape 1 — Modèle et calculs de base (`lib/`)
 - `types.ts` : `Game`, `Player`, `GameEvent`, `ChipConfig` (SPEC §10). La conversion €/point est une **fraction exacte** `{num, den}` de centimes par point.
 - `money.ts` : centimes ↔ affichage `Intl fr-FR`, analyse d'une saisie française (« 12,5 » → 1250), arrondis entiers explicites.
 - `units.ts` : conversions € ↔ points ↔ BB avec la fraction ; formatage selon l'unité courante.
