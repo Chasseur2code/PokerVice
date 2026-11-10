@@ -11,7 +11,7 @@ Documents de référence (à lire avant toute tâche) :
 - Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md`.
 
 ## État
-La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étape 0 faite (squelette, page « Hello » temporaire dans `src/ui/App.tsx`, `src/lib/smoke.test.ts` à supprimer quand `lib/` aura de vrais tests). Prochaine étape : **1 (modèle et calculs de base)**. Dépôt GitHub pas encore créé ni poussé.
+La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étape 0 faite (squelette, page « Hello » temporaire dans `src/ui/App.tsx`, `src/lib/smoke.test.ts` à supprimer quand `lib/` aura de vrais tests). Prochaine étape : **1 (modèle et calculs de base)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
 
 ## Commandes
 - `npm run dev` (localhost:5173), `npm run dev:lan` (téléphone en wifi), `npm run build` (`tsc -b` puis `vite build`), `npm run preview`
