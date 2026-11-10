@@ -11,7 +11,7 @@ Documents de référence (à lire avant toute tâche) :
 - Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md`.
 
 ## État
-La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étapes 0 à 2 faites (`lib/` : `types`, `money`, `units`, `derive`, `settlement`, `discrepancy` + tests ; page « Hello » temporaire dans `src/ui/App.tsx`). Prochaine étape : **3 (assistant jetons)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
+La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étapes 0 à 3 faites (`lib/` : `types`, `money`, `units`, `derive`, `settlement`, `discrepancy`, `chips` + tests ; page « Hello » temporaire dans `src/ui/App.tsx`). Prochaine étape : **4 (store et persistance)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
 
 ## Commandes
 - `npm run dev` (localhost:5173), `npm run dev:lan` (téléphone en wifi), `npm run build` (`tsc -b` puis `vite build`), `npm run preview`

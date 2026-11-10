@@ -55,7 +55,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - `discrepancy.ts` : prorata des stacks finaux avec la méthode du plus fort reste ; « imputer à » un joueur ; message « Il manque X points (Y €) » ou « en trop ».
 - **Vérif** : tests sur des cas où **le glouton échoue** (par ex. +8,+7,−4,−4,−7 : le glouton fait 4 virements, l'optimum 3), somme des balances = 0 au centime (critères 4 et 5), déterminisme.
 
-### [ ] Étape 3 — Assistant de répartition des jetons (`lib/chips.ts`)
+### [x] Étape 3 — Assistant de répartition des jetons (`lib/chips.ts`)
 - Entrées et règles de SPEC §5.1 à 5.3. Recherche exhaustive :
   1. trier les couleurs par quantité décroissante (les plus nombreuses prennent les petites valeurs) ;
   2. choisir k couleurs utilisées (3 à 7, le reste en réserve) ;
