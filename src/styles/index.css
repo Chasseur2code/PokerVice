@@ -134,3 +134,80 @@
 @utility num {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- Mouvement (DESIGN §6) ---- */
+:root {
+  --ease-sheet: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Bottom sheet : glisse depuis le bas en mobile, fondu + légère montée en modale (≥ 768 px). */
+.sheet-backdrop {
+  background: rgba(43, 33, 24, 0.4);
+  opacity: 0;
+  transition: opacity 220ms var(--ease-sheet);
+}
+.sheet-backdrop[data-open] {
+  opacity: 1;
+}
+.sheet-panel {
+  transform: translateY(100%);
+  transition: transform 220ms var(--ease-sheet);
+}
+.sheet-panel[data-open] {
+  transform: translateY(var(--drag, 0px));
+}
+.sheet-panel[data-dragging] {
+  transition: none;
+}
+@media (min-width: 768px) {
+  .sheet-panel {
+    transform: translateY(16px);
+    opacity: 0;
+    transition:
+      transform 220ms var(--ease-sheet),
+      opacity 220ms var(--ease-sheet);
+  }
+  .sheet-panel[data-open] {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Toast : fondu et montée de 8 px en 150 ms. */
+.toast {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+}
+.toast[data-open] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Siège : descend légèrement au tap. */
+.seat {
+  translate: -50% -50%;
+  transition: scale 120ms ease-out;
+}
+.seat:active {
+  scale: 0.97;
+}
+
+/* Sans translation : les sheets apparaissent en simple fondu. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    opacity: 0;
+    transition: opacity 150ms linear;
+  }
+  .sheet-panel[data-open] {
+    opacity: 1;
+  }
+  .sheet-panel,
+  .sheet-panel[data-open],
+  .toast,
+  .toast[data-open] {
+    transform: none;
+  }
+}

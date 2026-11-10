@@ -72,7 +72,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - `persist` : clé `pokervice`, `version: 1`, `migrate` prêt pour plus tard.
 - **Vérif** : tests du store (enchaînement d'une partie complète, verrouillage de la config, annulation, rechargement simulé avec restauration à l'identique).
 
-### [ ] Étape 5 — Composants de base et table
+### [x] Étape 5 — Composants de base et table
 - `BottomSheet` (mobile) / modale (≥ 768 px), animation de 220 ms, fermeture par glissement, voile ou Échap ; `Toast` (un seul à la fois, 5 s) ; `NumberField` (Fraunces 34, unité, équivalence affichée en dessous) ; boutons principal, secondaire et icône.
 - `lib/seats.ts` : positions sur l'ellipse (DESIGN §3), tailles 84×58 puis 76×54 à partir de 9 joueurs, inversion de l'ovale en paysage (testé).
 - `Table` : feutre, bois, liseré, centre configurable, sièges occupés, vides et mis en avant.
