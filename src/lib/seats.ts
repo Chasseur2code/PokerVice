@@ -81,3 +81,15 @@ export function emptySeatCount(playerCount: number): number {
   if (playerCount >= MAX_SEATED) return 0
   return Math.max(1, INITIAL_SEATS - playerCount)
 }
+
+/**
+ * Ordre d'affichage autour de la table : le premier élément va au siège du bas (index ⌊N/2⌋,
+ * le plus proche du pouce), les suivants dans le sens horaire. `result[i]` = élément du siège i
+ * (0 = en haut, comme `seatPositions`). Sert en préparation comme en partie : personne ne change
+ * de place au démarrage.
+ */
+export function fromBottom<T>(items: readonly T[]): T[] {
+  const n = items.length
+  const offset = Math.floor(n / 2)
+  return Array.from({ length: n }, (_, i) => items[(i - offset + n) % n]!)
+}

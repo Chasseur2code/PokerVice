@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { divFloor, divRound, formatCents, parseEuros, roundToEuro } from './money'
+import { centsToInput, divFloor, divRound, formatCents, parseEuros, roundToEuro } from './money'
 
 // Intl fr-FR utilise des espaces insécables : on les normalise pour comparer.
 const plain = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ')
@@ -81,5 +81,18 @@ describe('parseEuros', () => {
     // 0,1 + 0,2 en flottant ≠ 0,3 ; ici tout est entier.
     expect(parseEuros('0,1')! + parseEuros('0,2')!).toBe(parseEuros('0,3'))
     expect(parseEuros('19,99')).toBe(1999)
+  })
+})
+
+describe('centsToInput', () => {
+  it('omet les centimes ronds et garde la virgule sinon', () => {
+    expect(centsToInput(2000)).toBe('20')
+    expect(centsToInput(1250)).toBe('12,50')
+    expect(centsToInput(5)).toBe('0,05')
+    expect(centsToInput(-1205)).toBe('-12,05')
+  })
+
+  it('aller-retour avec parseEuros', () => {
+    for (const c of [0, 1, 99, 100, 2000, 123456, -50]) expect(parseEuros(centsToInput(c))).toBe(c)
   })
 })

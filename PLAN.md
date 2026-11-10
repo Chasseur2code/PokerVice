@@ -78,7 +78,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - `Table` : feutre, bois, liseré, centre configurable, sièges occupés, vides et mis en avant.
 - **Vérif** : page de démo temporaire avec 2, 6 et 10 sièges, en portrait et en paysage.
 
-### [ ] Étape 6 — Écran de préparation (DESIGN §4.1)
+### [x] Étape 6 — Écran de préparation (DESIGN §4.1)
 - En-tête, carte buy-in avec sheet « Modifier », table avec 6 sièges vides, siège du bas mis en avant et « Commencez ici », états 0, 1 et 2+ joueurs, sheet « Nouveau joueur » (couleur attribuée automatiquement selon la palette §2.3), lien « Besoin d'aide pour les jetons ? » avec sa sheet Oui / Non (l'assistant et le convertisseur sont branchés à l'étape 8), bouton « Démarrer » désactivé ou en accent.
 - **Vérif** : sur téléphone (`npm run dev:lan`), ajouter 3 joueurs puis démarrer.
 

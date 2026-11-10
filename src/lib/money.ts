@@ -96,3 +96,11 @@ export function parseEuros(input: string): number | null {
   if (!Number.isSafeInteger(cents)) return null
   return sign === '-' && cents !== 0 ? -cents : cents
 }
+
+/** Valeur initiale d'un champ de saisie en euros : 2000 → « 20 », 1250 → « 12,50 » (inverse de parseEuros). */
+export function centsToInput(cents: number): string {
+  assertInt(cents, 'cents')
+  const abs = Math.abs(cents)
+  const euros = `${cents < 0 ? '-' : ''}${Math.trunc(abs / 100)}`
+  return abs % 100 === 0 ? euros : `${euros},${String(abs % 100).padStart(2, '0')}`
+}

@@ -19,8 +19,8 @@ export type SeatSlot =
       key: string
       name: string
       color: string
-      /** Montant déjà formaté dans l'unité courante (total investi). */
-      amount: string
+      /** Montant déjà formaté dans l'unité courante (total investi) ; absent avant « Démarrer ». */
+      amount?: string
       /** Ex. « Hugo, 20 € investis ». */
       ariaLabel: string
       onClick?: () => void
@@ -113,7 +113,7 @@ function Seat({ slot, at, zone, card }: SeatProps) {
           <span class="size-2.5 shrink-0 rounded-full" style={{ background: slot.color }} />
           <span class="truncate text-seat-name font-semibold">{slot.name}</span>
         </span>
-        <span class="num truncate text-body font-bold">{slot.amount}</span>
+        {slot.amount !== undefined && <span class="num truncate text-body font-bold">{slot.amount}</span>}
       </button>
     )
   }

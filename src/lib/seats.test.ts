@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptySeatCount, seatPositions, seatSize, tableGeometry } from './seats'
+import { emptySeatCount, fromBottom, seatPositions, seatSize, tableGeometry } from './seats'
 
 function close(p: { x: number; y: number }, x: number, y: number) {
   expect(p.x).toBeCloseTo(x, 9)
@@ -81,5 +81,24 @@ describe('seatSize', () => {
 describe('emptySeatCount', () => {
   it('complète jusqu’à 6, puis un seul, puis aucun à 10', () => {
     expect([0, 1, 5, 6, 7, 9, 10].map(emptySeatCount)).toEqual([6, 5, 1, 1, 1, 1, 0])
+  })
+})
+
+describe('fromBottom', () => {
+  it('6 sièges : le premier en bas (index 3), puis sens horaire', () => {
+    expect(fromBottom(['a', 'b', 'c', 'd', 'e', 'f'])).toEqual(['d', 'e', 'f', 'a', 'b', 'c'])
+  })
+
+  it('le premier élément est toujours au siège du bas ou juste à sa gauche', () => {
+    for (let n = 1; n <= 10; n++) {
+      const items = Array.from({ length: n }, (_, i) => i)
+      const out = fromBottom(items)
+      expect(out.indexOf(0)).toBe(Math.floor(n / 2))
+      expect([...out].sort((a, b) => a - b)).toEqual(items)
+    }
+  })
+
+  it('liste vide', () => {
+    expect(fromBottom([])).toEqual([])
   })
 })
