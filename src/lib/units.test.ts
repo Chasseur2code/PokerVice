@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   amountToInput,
+  bbPointsForDepth,
   centsPerPointToInput,
   converterConfig,
   formatEuroFraction,
@@ -161,6 +162,14 @@ describe('convertisseur simple', () => {
     expect(converterConfig('0', '100')).toBeNull()
     expect(converterConfig('0,01', '0')).toBeNull()
     expect(converterConfig('0,01', '1,5')).toBeNull()
+  })
+  it('déduit la BB de la profondeur voulue', () => {
+    // 20 € à 1 pt = 0,01 € : 2 000 pts.
+    expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 100)).toBe(20)
+    expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 50)).toBe(40)
+    expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 150)).toBe(13) // 13,33 arrondi
+    expect(bbPointsForDepth(2000, { num: 1, den: 5 }, 100)).toBe(100) // 1 pt = 0,002 €
+    expect(bbPointsForDepth(100, { num: 100, den: 1 }, 200)).toBe(1) // jamais 0
   })
   it('lit un entier et convertit des points en BB', () => {
     expect(parseCount('2 350')).toBe(2350)

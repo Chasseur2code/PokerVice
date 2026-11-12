@@ -206,3 +206,11 @@ export function converterConfig(euroPerPointInput: string, bbPointsInput: string
   if (!centsPerPoint || !bbPoints) return null
   return { mode: 'converter', centsPerPoint, bbPoints, sbPoints: Math.max(1, divFloor(bbPoints, 2)) }
 }
+
+/**
+ * BB en points pour qu'un buy-in fasse `depthBB` big blinds (convertisseur) : buy-in ÷ profondeur ÷ valeur du point,
+ * arrondie au point le plus proche (au moins 1).
+ */
+export function bbPointsForDepth(buyInCents: number, centsPerPoint: Fraction, depthBB: number): number {
+  return Math.max(1, divRound(buyInCents * centsPerPoint.den, centsPerPoint.num * depthBB))
+}
