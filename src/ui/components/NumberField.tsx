@@ -34,7 +34,10 @@ export function NumberField({
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (autoFocus) input.current?.focus({ preventScroll: true })
+    if (!autoFocus || !input.current) return
+    input.current.focus({ preventScroll: true })
+    // Valeur préremplie (« 20 ») sélectionnée : taper « 10 » la remplace au lieu de donner « 2010 ».
+    input.current.select()
   }, [autoFocus])
 
   return (
