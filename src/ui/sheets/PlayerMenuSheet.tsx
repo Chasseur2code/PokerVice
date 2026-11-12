@@ -89,11 +89,15 @@ export function PlayerMenuSheet({ open, onClose, playerId, onEdit }: PlayerMenuS
     </span>
   )
 
+  // Clés distinctes : sinon Preact réutilise le même <button>, qui devient « submit » avant la fin
+  // du clic sur « Recave » ; ce clic soumettait alors aussitôt le formulaire avec la valeur préremplie.
   const footer =
     view === 'menu' ? (
-      <PrimaryButton onClick={() => go('rebuy')}>Recave</PrimaryButton>
+      <PrimaryButton key="open" onClick={() => go('rebuy')}>
+        Recave
+      </PrimaryButton>
     ) : (
-      <PrimaryButton type="submit" form={formId} disabled={!valid}>
+      <PrimaryButton key="submit" type="submit" form={formId} disabled={!valid}>
         {view === 'rebuy' ? 'Valider la recave' : 'Quitter la table'}
       </PrimaryButton>
     )
