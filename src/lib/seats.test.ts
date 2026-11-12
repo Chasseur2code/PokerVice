@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { SEAT_MAX_WIDTH, emptySeatCount, fromBottom, seatMaxWidths, seatPositions, seatSize, tableGeometry } from './seats'
+import {
+  EMPTY_SEAT_SIZE,
+  HIGHLIGHT_SEAT_SIZE,
+  SEAT_MAX_WIDTH,
+  SEAT_TALL_HEIGHT,
+  emptySeatCount,
+  emptySeatSize,
+  fromBottom,
+  seatLayout,
+  seatPositions,
+  seatSize,
+  tableGeometry,
+  type SeatKind,
+} from './seats'
 
 function close(p: { x: number; y: number }, x: number, y: number) {
   expect(p.x).toBeCloseTo(x, 9)
@@ -69,41 +82,72 @@ describe('tableGeometry', () => {
   })
 })
 
-describe('seatMaxWidths', () => {
+describe('seatLayout', () => {
   const both = ['portrait', 'landscape'] as const
+  const players = (n: number) => Array<SeatKind>(n).fill('player')
+  const HALO = 6
 
   it('à 2 joueurs, les deux cartes (haut et bas) ont la largeur maximale', () => {
-    for (const o of both) expect(seatMaxWidths([null, null], o, seatSize(2))).toEqual([SEAT_MAX_WIDTH, SEAT_MAX_WIDTH])
+    for (const o of both) expect(seatLayout(players(2), o).width).toEqual([SEAT_MAX_WIDTH, SEAT_MAX_WIDTH])
   })
 
   it('sièges latéraux limités par le bord de la zone, jamais sous la carte de base', () => {
     // Portrait, 4 sièges : gauche et droite à 39 unités du bord → 2 × (39 + 6).
-    expect(seatMaxWidths([null, null, null, null], 'portrait', seatSize(4))).toEqual([140, 90, 140, 90])
+    expect(seatLayout(players(4), 'portrait').width).toEqual([140, 90, 140, 90])
     // Paysage : le bord laisserait 72, on garde la carte de base (84).
-    expect(seatMaxWidths([null, null, null, null], 'landscape', seatSize(4))).toEqual([140, 84, 140, 84])
+    expect(seatLayout(players(4), 'landscape').width).toEqual([140, 84, 140, 84])
   })
 
-  it('les sièges vides gardent leur diamètre', () => {
-    const w = seatMaxWidths(fromBottom([null, null, 68, 52, 52, 52]), 'portrait', seatSize(2))
-    expect(w).toEqual([52, 52, 52, 140, 127, 68])
+  it('les sièges vides gardent leur diamètre et ne bougent pas', () => {
+    const kinds = fromBottom<SeatKind>(['player', 'player', 'highlighted', 'empty', 'empty', 'empty'])
+    const { width, at } = seatLayout(kinds, 'portrait')
+    expect(kinds.flatMap((k, i) => (k === 'player' ? [] : [width[i]]))).toEqual([EMPTY_SEAT_SIZE, EMPTY_SEAT_SIZE, EMPTY_SEAT_SIZE, HIGHLIGHT_SEAT_SIZE])
+    expect(kinds.map((k) => (k === 'player' ? 'player' : emptySeatSize(k)))).toEqual(kinds.map((k, i) => (k === 'player' ? 'player' : width[i])))
+    const p = seatPositions(kinds.length, 'portrait')
+    kinds.forEach((k, i) => k !== 'player' && expect(at[i]).toEqual(p[i]))
   })
 
-  it('de 2 à 10 joueurs : bornes, symétrie gauche-droite et aucun chevauchement entre cartes élargies', () => {
+  // Tables que produisent les écrans : préparation (joueurs puis sièges vides, le premier mis en avant
+  // sous 2 joueurs) et partie (joueurs seuls), toujours via fromBottom.
+  const tables: SeatKind[][] = []
+  for (let p = 0; p <= 10; p++) {
+    const empties = Array.from({ length: emptySeatCount(p) }, (_, j): SeatKind => (j === 0 && p < 2 ? 'highlighted' : 'empty'))
+    tables.push(fromBottom([...players(p), ...empties]))
+    if (p >= 1) tables.push(fromBottom(players(p)))
+  }
+
+  it('tables réelles : bornes, carte dans la zone et aucun chevauchement (cartes de base comprises)', () => {
     for (const o of both) {
-      for (let n = 2; n <= 10; n++) {
-        const card = seatSize(n)
-        const w = seatMaxWidths(Array<null>(n).fill(null), o, card)
-        const p = seatPositions(n, o)
-        for (let i = 0; i < n; i++) {
-          expect(w[i]).toBeGreaterThanOrEqual(card.width)
-          expect(w[i]).toBeLessThanOrEqual(SEAT_MAX_WIDTH)
-          expect(w[(n - i) % n]).toBe(w[i])
-          for (let j = i + 1; j < n; j++) {
-            if (w[i] === card.width || w[j] === card.width) continue
-            if (Math.abs(p[i]!.y - p[j]!.y) >= card.height) continue
-            expect(Math.abs(p[i]!.x - p[j]!.x)).toBeGreaterThanOrEqual((w[i]! + w[j]!) / 2)
+      const { zone } = tableGeometry(o)
+      for (const kinds of tables) {
+        const { card, at, width } = seatLayout(kinds, o)
+        // Encombrement maximal de chaque siège : carte sur deux lignes, halo compris.
+        const box = kinds.map((k, i) => {
+          if (k === 'player') return { w: width[i]!, h: SEAT_TALL_HEIGHT }
+          const d = width[i]! + (k === 'highlighted' ? 2 * HALO : 0)
+          return { w: d, h: d }
+        })
+        for (let i = 0; i < kinds.length; i++) {
+          if (kinds[i] === 'player') {
+            expect(width[i]).toBeGreaterThanOrEqual(card.width)
+            expect(width[i]).toBeLessThanOrEqual(SEAT_MAX_WIDTH)
+            expect(at[i]!.y - SEAT_TALL_HEIGHT / 2).toBeGreaterThanOrEqual(0)
+            expect(at[i]!.y + SEAT_TALL_HEIGHT / 2).toBeLessThanOrEqual(zone.height)
+          }
+          for (let j = i + 1; j < kinds.length; j++) {
+            if (Math.abs(at[i]!.y - at[j]!.y) >= (box[i]!.h + box[j]!.h) / 2) continue
+            expect(Math.abs(at[i]!.x - at[j]!.x), `${o} ${kinds.join()} ${i}-${j}`).toBeGreaterThanOrEqual((box[i]!.w + box[j]!.w) / 2)
           }
         }
+      }
+    }
+  })
+
+  it('symétrie gauche-droite quand tous les sièges sont occupés', () => {
+    for (const o of both) {
+      for (let n = 2; n <= 10; n++) {
+        const { width } = seatLayout(players(n), o)
+        for (let i = 0; i < n; i++) expect(width[(n - i) % n]).toBe(width[i])
       }
     }
   })

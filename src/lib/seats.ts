@@ -68,39 +68,71 @@ export function seatSize(seatedCount: number): Size {
 
 /** Largeur maximale d'une carte : au-delà, un prénom long passe sur deux lignes. */
 export const SEAT_MAX_WIDTH = 140
+/**
+ * Hauteur d'une carte dont le prénom tient sur deux lignes, montant compris (px de maquette) :
+ * 4 + 2 × 13 × 1,25 + 2 + 14 × 1,5 + 4 ≈ 64. À tenir à jour avec les classes de la carte (Table).
+ */
+export const SEAT_TALL_HEIGHT = 64
 /** Écart minimal entre deux sièges voisins. */
 const SEAT_GAP = 6
 /** Débord toléré hors de la zone (la carte de base déborde déjà un peu aux sièges latéraux). */
 const ZONE_OVERFLOW = 6
 
+/** Diamètres des sièges vides (DESIGN §3). */
+export const EMPTY_SEAT_SIZE = 52
+export const HIGHLIGHT_SEAT_SIZE = 68
+/** Épaisseur du halo du siège mis en avant (`--shadow-halo`). */
+const HALO_WIDTH = 6
+
+export type SeatKind = 'player' | 'empty' | 'highlighted'
+
+/** Diamètre rendu d'un siège vide. */
+export function emptySeatSize(kind: Exclude<SeatKind, 'player'>): number {
+  return kind === 'highlighted' ? HIGHLIGHT_SEAT_SIZE : EMPTY_SEAT_SIZE
+}
+
+export interface SeatLayout {
+  /** Carte de base des sièges occupés (largeur et hauteur minimales). */
+  card: Size
+  /** Centre de chaque siège (unités de zone). */
+  at: Point[]
+  /** Largeur maximale de la carte (siège occupé) ou diamètre (siège vide). */
+  width: number[]
+}
+
 /**
- * Largeur maximale de chaque siège (DESIGN §3) : un siège occupé s'élargit tant qu'il ne touche ni
- * ses voisins ni le bord de la zone, entre `card.width` et SEAT_MAX_WIDTH. Deux cartes qui se font
- * face se partagent l'écart à parts égales. `round[i]` = diamètre du siège i s'il est vide (rendu tel
- * quel), `null` s'il est occupé. Mêmes indices que `seatPositions`.
+ * Disposition des sièges (DESIGN §3), mêmes indices que `seatPositions`.
+ * - Un siège occupé est centré sur l'ellipse, mais descendu ou remonté si sa carte sur deux lignes
+ *   sortirait de la zone en haut ou en bas.
+ * - Il s'élargit tant qu'il ne touche ni ses voisins ni le bord de la zone, entre `card.width` et
+ *   SEAT_MAX_WIDTH. Deux cartes qui se font face se partagent l'écart à parts égales. Les voisins
+ *   sont comptés avec leur encombrement maximal (carte sur deux lignes, halo du siège mis en avant).
  */
-export function seatMaxWidths(round: readonly (number | null)[], orientation: Orientation, card: Size): number[] {
-  const pos = seatPositions(round.length, orientation)
+export function seatLayout(kinds: readonly SeatKind[], orientation: Orientation): SeatLayout {
   const { zone } = tableGeometry(orientation)
-  return round.map((own, i) => {
-    if (own !== null) return own
-    const { x, y } = pos[i]!
+  const card = seatSize(kinds.filter((k) => k === 'player').length)
+  const half = SEAT_TALL_HEIGHT / 2
+  const at = seatPositions(kinds.length, orientation).map((p, i) =>
+    kinds[i] === 'player' ? { x: p.x, y: Math.min(Math.max(p.y, half), zone.height - half) } : p,
+  )
+  // Encombrement (largeur = hauteur) des sièges vides, halo compris ; null pour un siège occupé.
+  const round = kinds.map((k) => (k === 'player' ? null : emptySeatSize(k) + (k === 'highlighted' ? 2 * HALO_WIDTH : 0)))
+  const width = kinds.map((k, i) => {
+    if (k !== 'player') return emptySeatSize(k)
+    const { x, y } = at[i]!
     let w = Math.min(SEAT_MAX_WIDTH, 2 * (x + ZONE_OVERFLOW), 2 * (zone.width - x + ZONE_OVERFLOW))
     round.forEach((other, j) => {
       if (j === i) return
-      const dx = Math.abs(pos[j]!.x - x)
-      const dy = Math.abs(pos[j]!.y - y)
+      const dx = Math.abs(at[j]!.x - x)
+      const dy = Math.abs(at[j]!.y - y)
       // Pas de chevauchement vertical possible : ce voisin ne limite pas la largeur.
-      if (dy >= (card.height + (other ?? card.height)) / 2 + SEAT_GAP) return
+      if (dy >= (SEAT_TALL_HEIGHT + (other ?? SEAT_TALL_HEIGHT)) / 2 + SEAT_GAP) return
       w = Math.min(w, other === null ? dx - SEAT_GAP : 2 * (dx - SEAT_GAP) - other)
     })
     return Math.max(card.width, Math.floor(w))
   })
+  return { card, at, width }
 }
-
-/** Diamètres des sièges vides (DESIGN §3). */
-export const EMPTY_SEAT_SIZE = 52
-export const HIGHLIGHT_SEAT_SIZE = 68
 
 /** Nombre de sièges initial avant le premier joueur (DESIGN §4.1). */
 export const INITIAL_SEATS = 6

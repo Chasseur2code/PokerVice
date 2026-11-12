@@ -7,17 +7,8 @@
 // dans le style (variables --drag-x/y) : aucun re-rendu pendant le glissement.
 import type { ComponentChildren } from 'preact'
 import { Plus } from 'lucide-preact'
-import { useRef, useState } from 'preact/hooks'
-import {
-  EMPTY_SEAT_SIZE,
-  HIGHLIGHT_SEAT_SIZE,
-  seatMaxWidths,
-  seatPositions,
-  seatSize,
-  tableGeometry,
-  type Orientation,
-  type Point,
-} from '../../lib/seats'
+import { useMemo, useRef, useState } from 'preact/hooks'
+import { seatLayout, tableGeometry, type Orientation, type Point, type SeatKind } from '../../lib/seats'
 
 export type SeatSlot =
   | {
@@ -167,13 +158,9 @@ export function Table({ seats, orientation, center, onSwap }: TableProps) {
   const g = tableGeometry(orientation)
   const W = g.zone.width
   const H = g.zone.height
-  const positions = seatPositions(seats.length, orientation)
-  const card = seatSize(seats.filter((s) => s.kind === 'player').length)
-  const maxWidths = seatMaxWidths(
-    seats.map((s) => (s.kind === 'player' ? null : s.highlighted ? HIGHLIGHT_SEAT_SIZE : EMPTY_SEAT_SIZE)),
-    orientation,
-    card,
-  )
+  // La disposition ne dépend que de la nature des sièges : recalculée seulement quand elle change.
+  const kinds = seats.map((s): SeatKind => (s.kind === 'player' ? 'player' : s.highlighted ? 'highlighted' : 'empty')).join()
+  const layout = useMemo(() => seatLayout(kinds.split(',') as SeatKind[], orientation), [kinds, orientation])
   const { lifted, gestures } = useSeatGestures(onSwap)
 
   return (
@@ -197,7 +184,16 @@ export function Table({ seats, orientation, center, onSwap }: TableProps) {
       </div>
 
       {seats.map((s, i) => (
-        <Seat key={s.key} slot={s} at={positions[i]!} zone={g.zone} card={card} maxWidth={maxWidths[i]!} gestures={gestures} lifted={lifted === s.key} />
+        <Seat
+          key={s.key}
+          slot={s}
+          at={layout.at[i]!}
+          zone={g.zone}
+          card={layout.card}
+          width={layout.width[i]!}
+          gestures={gestures}
+          lifted={lifted === s.key}
+        />
       ))}
     </div>
   )
@@ -208,13 +204,16 @@ interface SeatProps {
   at: Point
   zone: { width: number; height: number }
   card: { width: number; height: number }
-  /** Largeur maximale de la carte (unités de zone) : elle s'ajuste au prénom entre `card.width` et ce maximum. */
-  maxWidth: number
+  /**
+   * Siège occupé : largeur maximale de la carte (unités de zone), qui s'ajuste au prénom entre `card.width`
+   * et ce maximum. Siège vide : diamètre.
+   */
+  width: number
   gestures?: SeatGestures
   lifted: boolean
 }
 
-function Seat({ slot, at, zone, card, maxWidth, gestures, lifted }: SeatProps) {
+function Seat({ slot, at, zone, card, width, gestures, lifted }: SeatProps) {
   const position = { left: pct(at.x, zone.width), top: pct(at.y, zone.height) }
   const base = 'seat absolute'
 
@@ -241,7 +240,7 @@ function Seat({ slot, at, zone, card, maxWidth, gestures, lifted }: SeatProps) {
           // Largeur du contenu, bornée : un prénom court garde une carte compacte.
           width: 'max-content',
           minWidth: scaled(card.width, zone.width),
-          maxWidth: scaled(maxWidth, zone.width),
+          maxWidth: scaled(width, zone.width),
           // Hauteur minimale seulement : un prénom sur deux lignes agrandit la carte.
           minHeight: scaled(card.height, zone.width),
           borderLeftColor: slot.color,
@@ -253,7 +252,7 @@ function Seat({ slot, at, zone, card, maxWidth, gestures, lifted }: SeatProps) {
     )
   }
 
-  const size = scaled(slot.highlighted ? HIGHLIGHT_SEAT_SIZE : EMPTY_SEAT_SIZE, zone.width)
+  const size = scaled(width, zone.width)
   return (
     <button
       type="button"
