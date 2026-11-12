@@ -188,7 +188,7 @@ Toutes les actions sont **horodatées (heure réelle)**. La durée écoulée se 
 | Action | Saisie | Effet |
 |---|---|---|
 | **Démarrer** | — | Enregistre l'heure de début, lance le chrono, enregistre un buy-in pour chaque joueur assis, verrouille la configuration jetons. |
-| **Ajouter un joueur** | nom, buy-in (défaut = buy-in commun, modifiable) | Nouveau siège. Si la partie a démarré, un buy-in est enregistré. |
+| **Ajouter un joueur** | nom, buy-in (défaut = buy-in commun, modifiable) | Nouveau siège, couleur attribuée automatiquement (modifiable ensuite par « Changer de couleur »). Si la partie a démarré, un buy-in est enregistré. |
 | **Recave** | montant : raccourci « +1 buy-in » ou montant libre, en € (ou en points si une configuration existe) | Augmente l'investi. Pas de plafond. |
 | **Quitter la table** | stack de sortie (en € ou en points) | Le joueur passe dans « Partis ». **Sa balance s'affiche immédiatement** (par exemple « Hugo : +12,40 € »). |
 | **Revenir** | buy-in | Le joueur se rassoit. |

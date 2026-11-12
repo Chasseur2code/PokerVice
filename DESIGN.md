@@ -151,7 +151,7 @@ De haut en bas, dans une colonne flex :
 - **1 joueur** : le texte du centre devient « Encore 1 joueur » ; le siège mis en avant passe au siège vide suivant.
 - **2 joueurs ou plus** : le centre affiche la BB si une configuration existe, sinon le buy-in. « Démarrer la partie » passe en `--accent` avec un texte `--on-accent`. Il n'y a plus de siège mis en avant, seulement des sièges vides normaux.
 - **Sièges vides** : on en affiche toujours au moins un, tant qu'il y a moins de 10 joueurs. Au-delà de 6 joueurs, on n'affiche plus qu'**un seul** siège vide.
-- **Tap sur un siège vide** : bottom sheet « Nouveau joueur ». On y trouve le champ prénom (avec focus automatique) et la couleur (proposée automatiquement, modifiable), puis le bouton « Ajouter ».
+- **Tap sur un siège vide** : bottom sheet « Nouveau joueur ». On y trouve seulement le champ prénom (avec focus automatique), puis le bouton « Ajouter ». La couleur est attribuée automatiquement (première libre de la palette §2.3) ; elle se change ensuite via « Changer de couleur » dans le menu joueur.
 - **Lien jetons** : un tap ouvre une petite bottom sheet avec deux choix, « Oui, aide-moi à répartir les jetons » (vers l'assistant) et « Non, juste convertir points ↔ € » (vers le convertisseur). Une fois « Non » choisi, le lien devient « Convertisseur jetons ↔ € ».
 
 ### 4.2 En partie — maquette « A-Partie »

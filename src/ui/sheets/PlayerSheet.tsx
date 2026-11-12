@@ -1,10 +1,9 @@
-// Sheet « Nouveau joueur » (DESIGN §4.1) : prénom (focus automatique) et couleur proposée ;
-// en cours de partie, s'y ajoute le buy-in du nouveau venu (par défaut le buy-in commun).
+// Sheet « Nouveau joueur » (DESIGN §4.1) : prénom seul (focus automatique), la couleur est attribuée
+// d'office ; en cours de partie, s'y ajoute le buy-in du nouveau venu (par défaut le buy-in commun).
 // Avec un `playerId`, la même sheet corrige le prénom ou la couleur, ou supprime le joueur
 // (seulement s'il n'a aucune transaction : en préparation, c'est toujours le cas).
 import type { RefObject } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
-import { nextPlayerColor } from '../../lib/players'
 import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmountKeeping } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { BottomSheet } from '../components/BottomSheet'
@@ -44,7 +43,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
   useEffect(() => {
     if (!open) return
     setName(player?.name ?? '')
-    setColorValue(player?.color ?? nextPlayerColor(players))
+    setColorValue(player?.color ?? '')
     setBuyIn(amountToInput(defaultBuyIn, inputUnit, cfg))
   }, [open])
 
@@ -60,7 +59,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
     const changed = !!player && (trimmed !== player.name || color !== player.color)
     const ok =
       playerId === null
-        ? addPlayer(trimmed, { color, buyInCents: askBuyIn ? buyInCents! : undefined }) !== null
+        ? addPlayer(trimmed, { buyInCents: askBuyIn ? buyInCents! : undefined }) !== null
         : !!player && updatePlayer(player.id, { name: trimmed, color })
     if (!ok) {
       showToast(playerId === null ? "Impossible d'ajouter ce joueur : la table est complète." : 'Impossible de modifier ce joueur.')
@@ -92,7 +91,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
     >
       <form id={formId} onSubmit={submit} class="flex flex-col gap-5 pb-1">
         <NameField inputRef={nameInput} value={name} onInput={setName} />
-        <ColorPicker value={color} onChange={setColorValue} taken={taken} />
+        {player && <ColorPicker value={color} onChange={setColorValue} taken={taken} />}
         {askBuyIn && (
           <NumberField
             label="Buy-in"
