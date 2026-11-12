@@ -6,11 +6,11 @@ import { useState } from 'preact/hooks'
 import { formatCents } from '../../lib/money'
 import { MIN_PLAYERS_TO_START } from '../../lib/players'
 import { emptySeatCount, fromBottom } from '../../lib/seats'
-import { pointsToCents } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { PrimaryButton } from '../components/Button'
 import { Header } from '../components/Header'
 import { Table, type SeatSlot } from '../components/Table'
+import { TableCenterAmount } from '../components/TableCenter'
 import { showToast } from '../components/Toast'
 import { useOrientation } from '../hooks/useOrientation'
 import { BuyInSheet } from '../sheets/BuyInSheet'
@@ -25,7 +25,6 @@ type Sheet = 'buyIn' | 'player' | 'chipHelp' | null
  */
 const PORTRAIT_CHROME = '330px'
 const SAFE_Y = 'env(safe-area-inset-top) - env(safe-area-inset-bottom)'
-const fr = new Intl.NumberFormat('fr-FR')
 
 export function Setup() {
   const orientation = useOrientation()
@@ -86,19 +85,8 @@ export function Setup() {
       <p class="font-display text-felt-title font-semibold">
         Encore {MIN_PLAYERS_TO_START - seated.length} joueur{MIN_PLAYERS_TO_START - seated.length > 1 ? 's' : ''}
       </p>
-    ) : cfg ? (
-      <>
-        <p class="text-caps font-semibold uppercase text-on-felt-muted">Big blind</p>
-        <p class="num font-display text-felt-big font-bold">
-          {/* En pts/BB, la BB s'affiche telle quelle : un aller-retour par les centimes l'arrondirait. */}
-          {unit === 'eur' ? formatCents(pointsToCents(cfg.bbPoints, cfg), { compact: true }) : `${fr.format(cfg.bbPoints)} pts`}
-        </p>
-      </>
     ) : (
-      <>
-        <p class="text-caps font-semibold uppercase text-on-felt-muted">Buy-in</p>
-        <p class="num font-display text-felt-big font-bold">{formatCents(buyIn, { compact: true })}</p>
-      </>
+      <TableCenterAmount buyInCents={buyIn} cfg={cfg} unit={unit} />
     )
 
   const chipLabel =
@@ -142,7 +130,7 @@ export function Setup() {
           : `min(100%, max(240px, calc((100dvh - ${PORTRAIT_CHROME} - ${SAFE_Y}) * 358 / 460)))`,
       }}
     >
-      <Table seats={fromBottom(slots)} orientation={orientation} center={center} />
+      <Table seats={fromBottom(slots)} orientation={orientation} center={center} onSwap={(a, b) => gameStore.getState().reorderSeats([b, a])} />
     </div>
   )
 

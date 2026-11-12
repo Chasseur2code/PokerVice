@@ -82,7 +82,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - En-tête, carte buy-in avec sheet « Modifier », table avec 6 sièges vides, siège du bas mis en avant et « Commencez ici », états 0, 1 et 2+ joueurs, sheet « Nouveau joueur » (couleur attribuée automatiquement selon la palette §2.3), lien « Besoin d'aide pour les jetons ? » avec sa sheet Oui / Non (l'assistant et le convertisseur sont branchés à l'étape 8), bouton « Démarrer » désactivé ou en accent.
 - **Vérif** : sur téléphone (`npm run dev:lan`), ajouter 3 joueurs puis démarrer.
 
-### [ ] Étape 7 — Écran de partie (DESIGN §4.2)
+### [x] Étape 7 — Écran de partie (DESIGN §4.2)
 - 7a : carte de stats (tapis moyen en héros, durée qui tourne avec `setInterval` d'une seconde mais calculée depuis `startedAt`, en jeu, recaves), table avec l'investi, menu joueur (recave avec la pilule « +1 buy-in », quitter avec le toast de balance, renommer, couleur, supprimer), ligne « Partis » et sheet avec « Revenir à la table », ajout d'un joueur en cours de partie.
 - 7b : toast « Annuler », sheet Historique (modifier ou supprimer avec confirmation), réordonnancement par appui long de 400 ms puis échange de sièges, bouton Wake Lock (masqué si l'API n'existe pas, réacquis sur `visibilitychange`).
 - **Vérif** : une partie complète en € sur le téléphone, rechargement en pleine partie avec chrono intact (critères 1 et 2).

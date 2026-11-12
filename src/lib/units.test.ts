@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  amountToInput,
   centsToBB,
   centsToBBTenths,
   centsToPoints,
   formatAmount,
+  formatEquivalent,
   fraction,
+  inputUnitFor,
   parseAmount,
   parseCentsPerPoint,
   pointsToCents,
@@ -99,5 +102,25 @@ describe('parseAmount', () => {
   it('refuse une saisie de points décimale ou vide', () => {
     expect(parseAmount('12,5', 'pts', cfg)).toBeNull()
     expect(parseAmount('', 'pts', cfg)).toBeNull()
+  })
+})
+
+describe('saisie dans l’unité courante', () => {
+  it('saisit en points seulement avec une configuration et hors €', () => {
+    expect(inputUnitFor('eur', cfg)).toBe('eur')
+    expect(inputUnitFor('pts', cfg)).toBe('pts')
+    expect(inputUnitFor('bb', cfg)).toBe('pts')
+    expect(inputUnitFor('pts', undefined)).toBe('eur')
+  })
+  it('valeur initiale relisible par parseAmount', () => {
+    expect(amountToInput(1250, 'eur', cfg)).toBe('12,50')
+    expect(amountToInput(2000, 'pts', cfg)).toBe('10000')
+    expect(parseAmount(amountToInput(2000, 'pts', cfg), 'pts', cfg)).toBe(2000)
+    expect(amountToInput(2000, 'pts', undefined)).toBe('20')
+  })
+  it('équivalence dans l’autre unité', () => {
+    expect(plain(formatEquivalent(2000, 'eur', cfg)!)).toBe('= 10 000 pts · 100 BB')
+    expect(plain(formatEquivalent(2000, 'pts', cfg)!)).toBe('= 20 € · 100 BB')
+    expect(formatEquivalent(2000, 'eur', undefined)).toBeUndefined()
   })
 })

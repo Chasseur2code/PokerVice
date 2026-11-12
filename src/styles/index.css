@@ -32,6 +32,9 @@
   --color-loss: #b42318;
   --color-disabled-bg: #e4dacb;
   --color-toast-bg: #2b2118;
+  /* Gain / perte lisibles sur le fond sombre du toast (contraste ≥ 4,5:1). */
+  --color-gain-on-dark: #7fd6a2;
+  --color-loss-on-dark: #ff9b8f;
 
   /* §2.2 Table */
   --color-wood: #6e4428;
@@ -190,9 +193,19 @@
 .seat {
   translate: -50% -50%;
   transition: scale 120ms ease-out;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 .seat:active {
   scale: 0.97;
+}
+/* Siège soulevé par un appui long : il suit le doigt (variables écrites par Table). */
+.seat[data-lifted] {
+  z-index: 10;
+  scale: 1.05;
+  translate: calc(-50% + var(--drag-x, 0px)) calc(-50% + var(--drag-y, 0px));
+  box-shadow: 0 12px 24px rgba(40, 25, 10, 0.35);
+  transition: none;
 }
 
 /* Sans translation : les sheets apparaissent en simple fondu. */

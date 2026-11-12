@@ -1,5 +1,5 @@
 // Conversions € ↔ points ↔ BB, exactes grâce à la fraction centimes/point.
-import { divRound, formatCents, parseEuros, type FormatCentsOptions } from './money'
+import { centsToInput, divRound, formatCents, parseEuros, type FormatCentsOptions } from './money'
 import type { ChipConfig, Fraction, Unit } from './types'
 
 function gcd(a: number, b: number): number {
@@ -101,4 +101,24 @@ export function parseAmount(input: string, unit: InputUnit, cfg: ChipConfig | un
   const points = Number(s)
   if (!Number.isSafeInteger(points)) return null
   return pointsToCents(points, cfg)
+}
+
+/** Unité de saisie des sheets : les points si une configuration existe et que l'affichage n'est pas en €. */
+export function inputUnitFor(unit: Unit, cfg: ChipConfig | undefined): InputUnit {
+  return cfg && unit !== 'eur' ? 'pts' : 'eur'
+}
+
+/** Valeur initiale d'un champ de saisie : « 20 » (€) ou « 10000 » (pts), relisible par parseAmount. */
+export function amountToInput(cents: number, unit: InputUnit, cfg: ChipConfig | undefined): string {
+  return unit === 'pts' && cfg ? String(centsToPoints(cents, cfg)) : centsToInput(cents)
+}
+
+/**
+ * Équivalence affichée sous un champ (DESIGN §5) : « = 2 000 pts · 100 BB » pour une saisie en €,
+ * « = 20 € · 100 BB » pour une saisie en points. Rien sans configuration jetons.
+ */
+export function formatEquivalent(cents: number, unit: InputUnit, cfg: ChipConfig | undefined): string | undefined {
+  if (!cfg) return undefined
+  const other = unit === 'eur' ? formatAmount(cents, 'pts', cfg) : formatCents(cents, { compact: true })
+  return `= ${other} · ${formatAmount(cents, 'bb', cfg)}`
 }
