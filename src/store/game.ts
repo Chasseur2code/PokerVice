@@ -41,8 +41,7 @@ export interface PersistedState {
 export type UndoableAction =
   | 'setBuyIn'
   | 'addPlayer'
-  | 'renamePlayer'
-  | 'setColor'
+  | 'updatePlayer'
   | 'deletePlayer'
   | 'reorderSeats'
   | 'setChipConfig'
@@ -76,8 +75,8 @@ export interface GameActions {
   setBuyIn(cents: number): boolean
   /** Renvoie l'id du joueur créé, ou `null` si refusé (nom vide, table pleine, partie close). */
   addPlayer(name: string, opts?: AddPlayerOptions): string | null
-  renamePlayer(playerId: string, name: string): boolean
-  setColor(playerId: string, color: string): boolean
+  /** Prénom et/ou couleur en une seule action annulable ; refusé si le prénom ou la couleur est vide. */
+  updatePlayer(playerId: string, patch: { name?: string; color?: string }): boolean
   /** Seulement pour un joueur sans aucune transaction. */
   deletePlayer(playerId: string): boolean
   /**
@@ -181,13 +180,6 @@ export function createGameStore(storage: StateStorage) {
           }))
         }
 
-        const updatePlayer = (action: UndoableAction, playerId: string, patch: Partial<Player>): boolean => {
-          const game = openGame()
-          if (!game?.players.some((p) => p.id === playerId)) return false
-          commit(action, { game: { ...game, players: game.players.map((p) => (p.id === playerId ? { ...p, ...patch } : p)) } }, playerId)
-          return true
-        }
-
         const appendEvent = (action: UndoableAction, ev: GameEvent): void => {
           const game = get().game
           commit(action, { game: { ...game, events: [...game.events, ev] } }, ev.playerId)
@@ -223,13 +215,15 @@ export function createGameStore(storage: StateStorage) {
             return player.id
           },
 
-          renamePlayer(playerId, name) {
-            const trimmed = name.trim()
-            return trimmed ? updatePlayer('renamePlayer', playerId, { name: trimmed }) : false
-          },
-
-          setColor(playerId, color) {
-            return color ? updatePlayer('setColor', playerId, { color }) : false
+          updatePlayer(playerId, { name, color }) {
+            const game = openGame()
+            const player = game?.players.find((p) => p.id === playerId)
+            const trimmed = name?.trim()
+            if (!game || !player || trimmed === '' || color === '') return false
+            const next = { ...player, name: trimmed ?? player.name, color: color ?? player.color }
+            if (next.name === player.name && next.color === player.color) return true
+            commit('updatePlayer', { game: { ...game, players: game.players.map((p) => (p.id === playerId ? next : p)) } }, playerId)
+            return true
           },
 
           deletePlayer(playerId) {

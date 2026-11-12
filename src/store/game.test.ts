@@ -78,12 +78,22 @@ describe('préparation', () => {
 
   it('renomme, change la couleur, supprime', () => {
     setupThree()
-    expect(s().renamePlayer(idOf('Léo'), '  Léonard ')).toBe(true)
-    expect(s().renamePlayer(idOf('Hugo'), ' ')).toBe(false)
-    expect(s().setColor(idOf('Hugo'), '#6B7280')).toBe(true)
+    expect(s().updatePlayer(idOf('Léo'), { name: '  Léonard ' })).toBe(true)
+    expect(s().updatePlayer(idOf('Hugo'), { name: ' ' })).toBe(false)
+    expect(s().updatePlayer(idOf('Hugo'), { color: '' })).toBe(false)
+    expect(s().updatePlayer(idOf('Hugo'), { color: '#6B7280' })).toBe(true)
     expect(s().game.players[0]!.color).toBe('#6B7280')
     expect(s().deletePlayer(idOf('Julie'))).toBe(true)
     expect(s().game.players.map((p) => p.name)).toEqual(['Hugo', 'Léonard'])
+  })
+
+  it('modifie prénom et couleur en une seule action annulable', () => {
+    setupThree()
+    const before = s().game
+    expect(s().updatePlayer(idOf('Hugo'), { name: 'Hugues', color: '#6B7280' })).toBe(true)
+    expect(s().undoable?.action).toBe('updatePlayer')
+    expect(s().undo()).toBe(true)
+    expect(s().game).toBe(before)
   })
 
   it('valide le buy-in commun', () => {

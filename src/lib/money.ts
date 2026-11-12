@@ -101,6 +101,6 @@ export function parseEuros(input: string): number | null {
 export function centsToInput(cents: number): string {
   assertInt(cents, 'cents')
   const abs = Math.abs(cents)
-  const euros = `${cents < 0 ? '-' : ''}${Math.trunc(abs / 100)}`
+  const euros = `${cents < 0 ? '-' : ''}${divFloor(abs, 100)}`
   return abs % 100 === 0 ? euros : `${euros},${String(abs % 100).padStart(2, '0')}`
 }

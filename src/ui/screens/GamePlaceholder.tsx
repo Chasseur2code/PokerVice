@@ -32,10 +32,18 @@ export function GamePlaceholder() {
       <Header>
         <span class="text-[13px] text-text-muted">Partie en cours</span>
       </Header>
-      <div class="mx-auto w-full" style={{ maxWidth: 'min(100%, max(240px, calc((100dvh - 200px) * 358 / 460)))' }}>
+      <div
+        class="mx-auto w-full"
+        style={{
+          maxWidth:
+            orientation === 'landscape'
+              ? 'min(100%, calc((100dvh - 200px) * 460 / 358))'
+              : 'min(100%, max(240px, calc((100dvh - 200px) * 358 / 460)))',
+        }}
+      >
         <Table
           seats={fromBottom(slots)}
-          orientation={orientation === 'landscape' ? 'landscape' : 'portrait'}
+          orientation={orientation}
           center={<p class="font-display text-felt-title font-semibold">Écran de partie : étape 7</p>}
         />
       </div>

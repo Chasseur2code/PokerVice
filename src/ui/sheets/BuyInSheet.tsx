@@ -2,7 +2,7 @@
 import { useEffect, useId, useState } from 'preact/hooks'
 import { centsToInput, parseEuros } from '../../lib/money'
 import { centsToBB, centsToPoints } from '../../lib/units'
-import { useGame } from '../../store/useGame'
+import { gameStore, useGame } from '../../store/useGame'
 import { BottomSheet } from '../components/BottomSheet'
 import { PrimaryButton } from '../components/Button'
 import { NumberField } from '../components/NumberField'
@@ -12,7 +12,6 @@ const fr = new Intl.NumberFormat('fr-FR')
 export function BuyInSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const buyIn = useGame((s) => s.game.defaultBuyInCents)
   const cfg = useGame((s) => s.game.chipConfig)
-  const setBuyIn = useGame((s) => s.setBuyIn)
   const formId = useId()
   const [value, setValue] = useState('')
 
@@ -27,7 +26,7 @@ export function BuyInSheet({ open, onClose }: { open: boolean; onClose: () => vo
 
   const submit = (e: Event) => {
     e.preventDefault()
-    if (valid && (cents === buyIn || setBuyIn(cents))) onClose()
+    if (valid && (cents === buyIn || gameStore.getState().setBuyIn(cents))) onClose()
   }
 
   return (

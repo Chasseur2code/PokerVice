@@ -1,13 +1,11 @@
 // Choix de la couleur d'un joueur parmi la palette (DESIGN §2.3) : un groupe de boutons radio.
 import { Check } from 'lucide-preact'
-import { PLAYER_COLORS } from '../../lib/players'
-
-const NAMES = ['Rouge', 'Bleu', 'Ambre', 'Violet', 'Sarcelle', 'Rose', 'Orange', 'Cyan', 'Brun', 'Gris']
+import { PLAYER_PALETTE } from '../../lib/players'
 
 export interface ColorPickerProps {
   value: string
   onChange: (color: string) => void
-  /** Couleurs déjà prises par d'autres joueurs : choisissables, mais signalées par une pastille creuse. */
+  /** Couleurs déjà prises par d'autres joueurs (en majuscules) : choisissables, mais signalées par une pastille creuse. */
   taken?: ReadonlySet<string>
 }
 
@@ -16,9 +14,9 @@ export function ColorPicker({ value, onChange, taken }: ColorPickerProps) {
     <fieldset class="flex flex-col gap-2">
       <legend class="mb-2 text-[13px] text-text-muted">Couleur</legend>
       <div class="grid grid-cols-5 justify-items-center gap-y-1">
-        {PLAYER_COLORS.map((c, i) => {
-          const selected = c.toUpperCase() === value.toUpperCase()
-          const used = !selected && taken?.has(c.toUpperCase())
+        {PLAYER_PALETTE.map(({ color: c, name }) => {
+          const selected = c === value.toUpperCase()
+          const used = !selected && taken?.has(c)
           return (
             <label key={c} class="flex size-11 cursor-pointer items-center justify-center">
               <input
@@ -27,7 +25,7 @@ export function ColorPicker({ value, onChange, taken }: ColorPickerProps) {
                 value={c}
                 checked={selected}
                 onChange={() => onChange(c)}
-                aria-label={used ? `${NAMES[i]} (déjà prise)` : NAMES[i]}
+                aria-label={used ? `${name} (déjà prise)` : name}
                 class="peer sr-only"
               />
               <span

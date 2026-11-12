@@ -1,6 +1,7 @@
 // Sheet « Nouveau joueur » (DESIGN §4.1) : prénom (focus automatique) et couleur proposée.
 // Avec un `playerId`, la même sheet corrige le prénom ou la couleur, ou supprime le joueur
 // (seulement s'il n'a aucune transaction : en préparation, c'est toujours le cas).
+import type { RefObject } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { nextPlayerColor } from '../../lib/players'
 import { gameStore, useGame } from '../../store/useGame'
@@ -24,6 +25,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
   const player = playerId === null ? undefined : players.find((p) => p.id === playerId)
 
   const formId = useId()
+  const nameInput = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
   const [color, setColorValue] = useState('')
 
@@ -36,24 +38,30 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
   const taken = new Set(players.filter((p) => p.id !== playerId).map((p) => p.color.toUpperCase()))
   const trimmed = name.trim()
 
-  const { addPlayer, renamePlayer, setColor, deletePlayer, undo } = gameStore.getState()
-
   const submit = (e: Event) => {
     e.preventDefault()
     if (!trimmed) return
-    if (playerId === null) {
-      if (addPlayer(trimmed, { color }) === null) return
-    } else if (player) {
-      if (trimmed !== player.name) renamePlayer(player.id, trimmed)
-      if (color !== player.color) setColor(player.id, color)
+    const { addPlayer, updatePlayer } = gameStore.getState()
+    const ok = playerId === null ? addPlayer(trimmed, { color }) !== null : !!player && updatePlayer(player.id, { name: trimmed, color })
+    if (!ok) {
+      showToast(playerId === null ? "Impossible d'ajouter ce joueur : la table est complète." : 'Impossible de modifier ce joueur.')
+      return
     }
     onClose()
   }
 
   const remove = () => {
-    if (!player || !deletePlayer(player.id)) return
+    if (!player || !gameStore.getState().deletePlayer(player.id)) return
     onClose()
-    showToast(`${player.name} retiré de la table`, { label: 'Annuler', onClick: undo })
+    const id = player.id
+    showToast(`${player.name} retiré de la table`, {
+      label: 'Annuler',
+      // Seulement si la suppression est encore la dernière action : sinon on annulerait autre chose.
+      onClick: () => {
+        const { undoable, undo } = gameStore.getState()
+        if (undoable?.action === 'deletePlayer' && undoable.playerId === id) undo()
+      },
+    })
   }
 
   return (
@@ -61,6 +69,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
       open={open}
       onClose={onClose}
       title={playerId === null ? 'Nouveau joueur' : 'Modifier le joueur'}
+      initialFocus={nameInput}
       footer={
         <PrimaryButton type="submit" form={formId} disabled={!trimmed}>
           {playerId === null ? 'Ajouter' : 'Enregistrer'}
@@ -68,7 +77,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
       }
     >
       <form id={formId} onSubmit={submit} class="flex flex-col gap-5 pb-1">
-        <NameField value={name} onInput={setName} />
+        <NameField inputRef={nameInput} value={name} onInput={setName} />
         <ColorPicker value={color} onChange={setColorValue} taken={taken} />
         {player && !hasEvents && (
           <button type="button" onClick={remove} class="h-11 self-start font-semibold text-loss">
@@ -80,11 +89,9 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
   )
 }
 
-/** Champ prénom, focalisé dès qu'il est monté (donc à chaque ouverture de la sheet). */
-function NameField({ value, onInput }: { value: string; onInput: (v: string) => void }) {
+/** Champ prénom ; la sheet le focalise à l'ouverture via `initialFocus`. */
+function NameField({ inputRef, value, onInput }: { inputRef: RefObject<HTMLInputElement | null>; value: string; onInput: (v: string) => void }) {
   const id = useId()
-  const input = useRef<HTMLInputElement>(null)
-  useEffect(() => input.current?.focus({ preventScroll: true }), [])
 
   return (
     <div class="flex flex-col gap-1.5">
@@ -92,7 +99,7 @@ function NameField({ value, onInput }: { value: string; onInput: (v: string) => 
         Prénom
       </label>
       <input
-        ref={input}
+        ref={inputRef}
         id={id}
         type="text"
         value={value}

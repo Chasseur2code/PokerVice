@@ -6,7 +6,7 @@ import { useState } from 'preact/hooks'
 import { formatCents } from '../../lib/money'
 import { MIN_PLAYERS_TO_START } from '../../lib/players'
 import { emptySeatCount, fromBottom } from '../../lib/seats'
-import { formatAmount, pointsToCents } from '../../lib/units'
+import { pointsToCents } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { PrimaryButton } from '../components/Button'
 import { Header } from '../components/Header'
@@ -25,6 +25,7 @@ type Sheet = 'buyIn' | 'player' | 'chipHelp' | null
  */
 const PORTRAIT_CHROME = '330px'
 const SAFE_Y = 'env(safe-area-inset-top) - env(safe-area-inset-bottom)'
+const fr = new Intl.NumberFormat('fr-FR')
 
 export function Setup() {
   const orientation = useOrientation()
@@ -82,12 +83,15 @@ export function Setup() {
         <p class="text-body text-white/86">Touchez un siège + pour ajouter quelqu'un. 2 joueurs minimum.</p>
       </>
     ) : seated.length < MIN_PLAYERS_TO_START ? (
-      <p class="font-display text-felt-title font-semibold">Encore 1 joueur</p>
+      <p class="font-display text-felt-title font-semibold">
+        Encore {MIN_PLAYERS_TO_START - seated.length} joueur{MIN_PLAYERS_TO_START - seated.length > 1 ? 's' : ''}
+      </p>
     ) : cfg ? (
       <>
         <p class="text-caps font-semibold uppercase text-on-felt-muted">Big blind</p>
         <p class="num font-display text-felt-big font-bold">
-          {formatAmount(pointsToCents(cfg.bbPoints, cfg), unit === 'bb' ? 'pts' : unit, cfg, { compact: true })}
+          {/* En pts/BB, la BB s'affiche telle quelle : un aller-retour par les centimes l'arrondirait. */}
+          {unit === 'eur' ? formatCents(pointsToCents(cfg.bbPoints, cfg), { compact: true }) : `${fr.format(cfg.bbPoints)} pts`}
         </p>
       </>
     ) : (

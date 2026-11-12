@@ -1,6 +1,6 @@
 // Bottom sheet en mobile, modale centrée à partir de 768 px (DESIGN §5).
 // Fermeture : glisser la poignée vers le bas, toucher le voile ou Échap.
-import type { ComponentChildren } from 'preact'
+import type { ComponentChildren, RefObject } from 'preact'
 import { createPortal } from 'preact/compat'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 
@@ -18,9 +18,15 @@ export interface BottomSheetProps {
   footer?: ComponentChildren
   /** Plein écran (historique, assistant jetons). */
   full?: boolean
+  /**
+   * Élément à focaliser à l'ouverture (sinon le panneau). Passer par ici plutôt que par un effet
+   * de l'enfant : les effets des enfants passent avant celui-ci, qui noterait alors l'enfant
+   * comme élément d'origine et ne rendrait plus le focus au bouton qui a ouvert la sheet.
+   */
+  initialFocus?: RefObject<HTMLElement | null>
 }
 
-export function BottomSheet({ open, onClose, title, children, footer, full = false }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, footer, full = false, initialFocus }: BottomSheetProps) {
   // `mounted` garde la sheet dans le DOM pendant l'animation de sortie ; `shown` pilote la transition.
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
@@ -53,8 +59,8 @@ export function BottomSheet({ open, onClose, title, children, footer, full = fal
     document.addEventListener('keydown', onKey)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const el = panel.current
-    if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true })
+    const el = initialFocus?.current ?? panel.current
+    el?.focus({ preventScroll: true })
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = overflow
