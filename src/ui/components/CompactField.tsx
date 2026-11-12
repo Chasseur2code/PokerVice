@@ -1,6 +1,7 @@
 // Petit champ de saisie (convertisseur, assistant jetons) : libellé, texte brut, suffixe d'unité.
 // Comme NumberField, il reste textuel : l'appelant analyse la saisie (parseCount, parseEuros…).
 import { useId } from 'preact/hooks'
+import { selectOnFocus } from '../selectOnFocus'
 
 export interface CompactFieldProps {
   label: string
@@ -48,6 +49,7 @@ export function CompactField({
           placeholder={placeholder}
           aria-invalid={invalid || undefined}
           onInput={(e) => onInput(e.currentTarget.value)}
+          onFocus={inputMode === 'text' ? undefined : selectOnFocus}
           class={`num w-full min-w-0 bg-transparent text-[16px] outline-none placeholder:text-text-faint ${inputMode === 'text' ? '' : 'text-right'}`}
         />
         {suffix && <span class="shrink-0 text-body text-text-muted">{suffix}</span>}

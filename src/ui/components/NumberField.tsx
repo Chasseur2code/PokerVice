@@ -2,6 +2,7 @@
 // équivalence dans l'autre unité en dessous. Le champ reste textuel : l'appelant analyse
 // la saisie avec parseAmount (lib/units), sans jamais passer par un flottant.
 import { useEffect, useId, useRef } from 'preact/hooks'
+import { selectOnFocus } from '../selectOnFocus'
 
 export interface NumberFieldProps {
   label: string
@@ -56,6 +57,7 @@ export function NumberField({
           placeholder={placeholder}
           value={value}
           onInput={(e) => onInput(e.currentTarget.value)}
+          onFocus={selectOnFocus}
           aria-invalid={error ? true : undefined}
           aria-describedby={`${id}-hint`}
           class="num min-w-0 flex-1 bg-transparent py-1 text-center font-display text-hero font-bold outline-none placeholder:text-text-faint"
