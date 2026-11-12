@@ -3,7 +3,7 @@
 // et le départ (stack de sortie, avec la balance qui en résulte).
 import { useEffect, useId, useState } from 'preact/hooks'
 import { summarizePlayers } from '../../lib/derive'
-import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmount } from '../../lib/units'
+import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmountKeeping } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { BottomSheet } from '../components/BottomSheet'
 import { PrimaryButton, SecondaryButton } from '../components/Button'
@@ -50,9 +50,11 @@ export function PlayerMenuSheet({ open, onClose, playerId, onEdit }: PlayerMenuS
 
   if (!player || !summary) return <BottomSheet open={open} onClose={onClose} title="" />
 
-  const cents = parseAmount(value, inputUnit, cfg)
+  const cents = parseAmountKeeping(value, inputUnit, cfg, view === 'rebuy' ? buyIn : null)
   const valid = cents !== null && (view === 'leave' ? cents >= 0 : cents > 0)
   const fmt = (c: number, sign = false) => formatAmount(c, unit, cfg, { compact: !sign, sign })
+  // Balance après ce départ : un joueur revenu a déjà encaissé son premier stack de sortie.
+  const balanceAfterLeave = (stack: number) => summary.balanceCents + stack
 
   const submit = (e: Event) => {
     e.preventDefault()
@@ -64,7 +66,7 @@ export function PlayerMenuSheet({ open, onClose, playerId, onEdit }: PlayerMenuS
       showUndoToast(`Recave de ${player.name} : ${fmt(cents)}`)
     } else if (view === 'leave') {
       if (!store.leave(player.id, cents)) return showToast('Départ impossible.')
-      const balance = cents - summary.investedCents
+      const balance = balanceAfterLeave(cents)
       onClose()
       showUndoToast(
         <>
@@ -165,7 +167,7 @@ export function PlayerMenuSheet({ open, onClose, playerId, onEdit }: PlayerMenuS
             {valid && (
               <>
                 {' · Balance '}
-                <SignedAmount cents={cents - summary.investedCents} text={fmt(cents - summary.investedCents, true)} />
+                <SignedAmount cents={balanceAfterLeave(cents)} text={fmt(balanceAfterLeave(cents), true)} />
               </>
             )}
           </p>

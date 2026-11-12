@@ -114,6 +114,21 @@ export function amountToInput(cents: number, unit: InputUnit, cfg: ChipConfig | 
 }
 
 /**
+ * parseAmount, sauf si la saisie est restée la valeur préremplie de `presetCents` : on rend alors
+ * ce montant exact. En points, l'aller-retour centimes → points → centimes arrondit quand le montant
+ * ne fait pas un nombre entier de points (20 € à 0,03 €/pt → 667 pts → 20,01 €).
+ */
+export function parseAmountKeeping(
+  input: string,
+  unit: InputUnit,
+  cfg: ChipConfig | undefined,
+  presetCents: number | null,
+): number | null {
+  if (presetCents !== null && input === amountToInput(presetCents, unit, cfg)) return presetCents
+  return parseAmount(input, unit, cfg)
+}
+
+/**
  * Équivalence affichée sous un champ (DESIGN §5) : « = 2 000 pts · 100 BB » pour une saisie en €,
  * « = 20 € · 100 BB » pour une saisie en points. Rien sans configuration jetons.
  */

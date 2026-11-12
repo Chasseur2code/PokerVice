@@ -4,7 +4,7 @@
 import { ArrowLeft } from 'lucide-preact'
 import { useEffect, useId, useState } from 'preact/hooks'
 import { MAX_SEATED } from '../../lib/players'
-import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmount } from '../../lib/units'
+import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmountKeeping } from '../../lib/units'
 import type { GameEvent, GameEventType } from '../../lib/types'
 import { gameStore, useGame } from '../../store/useGame'
 import { BottomSheet } from '../components/BottomSheet'
@@ -72,7 +72,7 @@ export function HistorySheet({ open, onClose }: { open: boolean; onClose: () => 
 
   const player = players.get(ev.playerId)
   const name = player?.name ?? 'Joueur supprimé'
-  const cents = parseAmount(value, inputUnit, cfg)
+  const cents = parseAmountKeeping(value, inputUnit, cfg, ev.amountCents)
   const valid = cents !== null && (ev.type === 'leave' ? cents >= 0 : cents > 0)
   const toList = () => setSelected(null)
 

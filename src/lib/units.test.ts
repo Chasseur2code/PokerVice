@@ -9,6 +9,7 @@ import {
   fraction,
   inputUnitFor,
   parseAmount,
+  parseAmountKeeping,
   parseCentsPerPoint,
   pointsToCents,
 } from './units'
@@ -117,6 +118,14 @@ describe('saisie dans l’unité courante', () => {
     expect(amountToInput(2000, 'pts', cfg)).toBe('10000')
     expect(parseAmount(amountToInput(2000, 'pts', cfg), 'pts', cfg)).toBe(2000)
     expect(amountToInput(2000, 'pts', undefined)).toBe('20')
+  })
+  it('garde le montant exact d’une valeur préremplie non entière en points', () => {
+    const odd: ChipConfig = { ...cfg, centsPerPoint: { num: 3, den: 1 } } // 1 pt = 0,03 €
+    expect(amountToInput(2000, 'pts', odd)).toBe('667')
+    expect(parseAmount('667', 'pts', odd)).toBe(2001)
+    expect(parseAmountKeeping('667', 'pts', odd, 2000)).toBe(2000)
+    expect(parseAmountKeeping('668', 'pts', odd, 2000)).toBe(2004)
+    expect(parseAmountKeeping('667', 'pts', odd, null)).toBe(2001)
   })
   it('équivalence dans l’autre unité', () => {
     expect(plain(formatEquivalent(2000, 'eur', cfg)!)).toBe('= 10 000 pts · 100 BB')

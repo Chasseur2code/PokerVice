@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'preact/hooks'
 import { summarizePlayers } from '../../lib/derive'
 import { MAX_SEATED } from '../../lib/players'
-import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmount } from '../../lib/units'
+import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmountKeeping } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { BottomSheet } from '../components/BottomSheet'
 import { PrimaryButton } from '../components/Button'
@@ -39,19 +39,24 @@ export function LeftPlayersSheet({ open, onClose }: { open: boolean; onClose: ()
   const tableFull = seated >= MAX_SEATED
 
   const fmt = (c: number, sign = false) => formatAmount(c, unit, cfg, { compact: !sign, sign })
-  const back = left.find((x) => x.player.id === returning)
+  // Cherché parmi tous les joueurs : après « Revenir », il n'est plus parti, mais la sheet doit garder
+  // ce contenu pendant son animation de sortie (sinon elle bascule sur la liste « 0 parti »).
+  const backPlayer = returning === null ? undefined : game.players.find((p) => p.id === returning)
+  const back = backPlayer && { player: backPlayer }
+  // Une fois revenu, son propre siège ne compte plus comme un blocage.
+  const blocked = tableFull && summaries.get(returning ?? '')?.status === 'left'
 
   const startReturn = (id: string) => {
     setValue(amountToInput(game.defaultBuyInCents, inputUnit, cfg))
     setReturning(id)
   }
 
-  const cents = parseAmount(value, inputUnit, cfg)
+  const cents = parseAmountKeeping(value, inputUnit, cfg, game.defaultBuyInCents)
   const valid = cents !== null && cents > 0
 
   const submit = (e: Event) => {
     e.preventDefault()
-    if (!back || !valid) return
+    if (!back || !valid || blocked) return
     if (!gameStore.getState().return(back.player.id, cents)) return showToast('Retour impossible : la table est complète.')
     onClose()
     showUndoToast(`${back.player.name} revient à la table (${fmt(cents)})`)
@@ -64,7 +69,7 @@ export function LeftPlayersSheet({ open, onClose }: { open: boolean; onClose: ()
         onClose={onClose}
         title={`${back.player.name} revient`}
         footer={
-          <PrimaryButton type="submit" form={formId} disabled={!valid || tableFull}>
+          <PrimaryButton type="submit" form={formId} disabled={!valid || blocked}>
             Revenir à la table
           </PrimaryButton>
         }
@@ -76,7 +81,7 @@ export function LeftPlayersSheet({ open, onClose }: { open: boolean; onClose: ()
             onInput={setValue}
             unit={inputUnit === 'pts' ? 'pts' : '€'}
             equivalent={valid ? formatEquivalent(cents, inputUnit, cfg) : undefined}
-            error={tableFull ? `La table est complète (${MAX_SEATED} joueurs).` : value.trim() !== '' && !valid ? 'Montant invalide' : undefined}
+            error={blocked ? `La table est complète (${MAX_SEATED} joueurs).` : value.trim() !== '' && !valid ? 'Montant invalide' : undefined}
           />
         </form>
       </BottomSheet>

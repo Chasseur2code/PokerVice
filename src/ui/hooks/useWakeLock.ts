@@ -16,15 +16,20 @@ export function useWakeLock(enabled: boolean, onError: () => void): void {
     if (!enabled || !wakeLockSupported) return
     let sentinel: WakeLockSentinel | null = null
     let cancelled = false
+    // Une seule demande à la fois : deux demandes en vol donneraient deux verrous, dont un jamais relâché.
+    let requesting = false
 
     const acquire = async () => {
-      if (document.visibilityState !== 'visible' || (sentinel && !sentinel.released)) return
+      if (requesting || document.visibilityState !== 'visible' || (sentinel && !sentinel.released)) return
+      requesting = true
       try {
         const s = await navigator.wakeLock.request('screen')
         if (cancelled) void s.release()
         else sentinel = s
       } catch {
         if (!cancelled) onErrorRef.current()
+      } finally {
+        requesting = false
       }
     }
 

@@ -5,7 +5,7 @@
 import type { RefObject } from 'preact'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { nextPlayerColor } from '../../lib/players'
-import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmount } from '../../lib/units'
+import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmountKeeping } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { BottomSheet } from '../components/BottomSheet'
 import { PrimaryButton } from '../components/Button'
@@ -50,7 +50,7 @@ export function PlayerSheet({ open, onClose, playerId }: PlayerSheetProps) {
 
   const taken = new Set(players.filter((p) => p.id !== playerId).map((p) => p.color.toUpperCase()))
   const trimmed = name.trim()
-  const buyInCents = parseAmount(buyIn, inputUnit, cfg)
+  const buyInCents = parseAmountKeeping(buyIn, inputUnit, cfg, defaultBuyIn)
   const buyInValid = !askBuyIn || (buyInCents !== null && buyInCents > 0)
 
   const submit = (e: Event) => {
