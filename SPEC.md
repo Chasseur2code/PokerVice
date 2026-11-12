@@ -108,7 +108,7 @@ En **paysage** et sur **ordinateur**, la table s'élargit (ovale horizontal) et 
 
 ### 4.2 Sièges
 - De 2 à 10 joueurs assis. Les positions sont calculées pour se répartir harmonieusement autour de l'ovale, quel que soit le nombre de joueurs.
-- Chaque siège affiche une **pastille de couleur** propre au joueur (palette prédéfinie), le **nom complet** (tronqué avec « … » si trop long, nom complet visible au tap), et le **total investi** dans l'unité courante.
+- Chaque siège affiche la **couleur** propre au joueur (palette prédéfinie, en liseré), le **nom complet** (la carte s'élargit selon la place disponible, puis le nom passe sur deux lignes ; tronqué avec « … » au-delà, nom complet visible au tap), et le **total investi** dans l'unité courante.
 - Pas de stack en temps réel : on ne cherche pas à suivre les stacks pendant la partie.
 - Les sièges sont **réordonnables** (glisser-déposer) pour refléter les places réelles.
 - Pas de bouton dealer.

@@ -122,7 +122,7 @@ Sur un écran de 390 px de large, la zone de la table mesure **358 × 460 px**. 
 - **Centres des sièges** : ils sont sur une ellipse de rayons `rx = 140` et `ry = 200`, centrée en (179, 230).
 - **Formule** pour N joueurs (de 2 à 10), siège i (de 0 à N−1), en partant du haut et dans le sens horaire :
   `θ = i × 360° / N` ; `x = cx + rx·sin θ` ; `y = cy − ry·cos θ`.
-- **Siège occupé** : carte de 84 × 58 px, centrée sur (x, y). À partir de 9 joueurs, la réduire à 76 × 54 px.
+- **Siège occupé** : carte centrée sur (x, y), de 58 px de haut au minimum (54 px à partir de 9 joueurs). Sa largeur suit le prénom, entre 84 px (76 px à partir de 9 joueurs) et un maximum propre à chaque siège : la plus grande largeur qui ne touche ni les sièges voisins (6 px d'écart) ni le bord de la zone (6 px de débord tolérés), plafonnée à 140 px. À 2 joueurs, les deux sièges (haut et bas) ont donc 140 px. Le calcul est dans `seatMaxWidths` (`lib/seats.ts`).
 - **Siège vide** : rond de 52 px, bordure de 2 px en pointillés `--border-dashed`, fond `--bg`, icône « + » en `--text-faint`.
 - **Siège mis en avant** (premier lancement) : rond de 68 px, fond `--accent`, bordure de 4 px `--bg`, halo `0 0 0 6px var(--accent-halo)` et icône « + » en `--on-accent`.
 - **Paysage et ordinateur** : l'ovale passe à l'horizontale (on inverse rx et ry), et le bandeau de stats va dans une colonne à gauche (environ 280 px de large).
@@ -166,7 +166,7 @@ De haut en bas, dans une colonne flex :
      - puis « soit 156 BB » (13 px, muted), seulement si une configuration existe.
    - **Droite** (séparée par une bordure gauche de 1 px `--border`) : trois lignes de 13 px, avec le libellé en muted à gauche et la valeur en 600 `--text` à droite : **Durée** (h:mm:ss), **En jeu**, **Recaves**.
 3. **Table** (voir §3) :
-   - **Sièges occupés** : carte `--surface`. Ligne 1 : pastille de couleur de 10 px puis le prénom, tronqué avec « … » (le nom complet s'affiche au tap). Ligne 2 : le total investi dans l'unité courante.
+   - **Sièges occupés** : carte `--surface`. Liseré de 4 px à gauche dans la couleur du joueur (à la place d'une pastille, pour laisser toute la largeur au nom). Puis le prénom, sur deux lignes au plus avant d'être tronqué avec « … » (le nom complet s'affiche au tap). Enfin le total investi dans l'unité courante.
    - **Centre** : « BIG BLIND » (12 px, capitales, blanc à 80 %) au-dessus de la valeur (Fraunces 30). Sans configuration jetons, on affiche à la place « BUY-IN » et le buy-in commun.
 4. **Ligne « Partis »** (44 px, fond transparent, bordure 1 px `#E2D8C8`, rayon 12) :
    - texte : « 1 parti · **Thomas** **+12,40 €** », avec le dernier parti et sa balance en `--gain` ou `--loss` ;

@@ -11,6 +11,7 @@ import { useRef, useState } from 'preact/hooks'
 import {
   EMPTY_SEAT_SIZE,
   HIGHLIGHT_SEAT_SIZE,
+  seatMaxWidths,
   seatPositions,
   seatSize,
   tableGeometry,
@@ -168,6 +169,11 @@ export function Table({ seats, orientation, center, onSwap }: TableProps) {
   const H = g.zone.height
   const positions = seatPositions(seats.length, orientation)
   const card = seatSize(seats.filter((s) => s.kind === 'player').length)
+  const maxWidths = seatMaxWidths(
+    seats.map((s) => (s.kind === 'player' ? null : s.highlighted ? HIGHLIGHT_SEAT_SIZE : EMPTY_SEAT_SIZE)),
+    orientation,
+    card,
+  )
   const { lifted, gestures } = useSeatGestures(onSwap)
 
   return (
@@ -191,7 +197,7 @@ export function Table({ seats, orientation, center, onSwap }: TableProps) {
       </div>
 
       {seats.map((s, i) => (
-        <Seat key={s.key} slot={s} at={positions[i]!} zone={g.zone} card={card} gestures={gestures} lifted={lifted === s.key} />
+        <Seat key={s.key} slot={s} at={positions[i]!} zone={g.zone} card={card} maxWidth={maxWidths[i]!} gestures={gestures} lifted={lifted === s.key} />
       ))}
     </div>
   )
@@ -202,11 +208,13 @@ interface SeatProps {
   at: Point
   zone: { width: number; height: number }
   card: { width: number; height: number }
+  /** Largeur maximale de la carte (unités de zone) : elle s'ajuste au prénom entre `card.width` et ce maximum. */
+  maxWidth: number
   gestures?: SeatGestures
   lifted: boolean
 }
 
-function Seat({ slot, at, zone, card, gestures, lifted }: SeatProps) {
+function Seat({ slot, at, zone, card, maxWidth, gestures, lifted }: SeatProps) {
   const position = { left: pct(at.x, zone.width), top: pct(at.y, zone.height) }
   const base = 'seat absolute'
 
@@ -227,13 +235,19 @@ function Seat({ slot, at, zone, card, gestures, lifted }: SeatProps) {
         onPointerCancel={gestures?.onPointerCancel}
         onTouchMove={gestures?.onTouchMove}
         onContextMenu={gestures && ((e) => e.preventDefault())}
-        class={`${base} flex flex-col justify-center gap-0.5 rounded-seat bg-surface px-2 text-left shadow-seat`}
-        style={{ ...position, width: scaled(card.width, zone.width), height: scaled(card.height, zone.width) }}
+        class={`${base} flex flex-col justify-center gap-0.5 rounded-seat border-l-4 bg-surface py-1 pr-2 pl-1.5 text-left shadow-seat`}
+        style={{
+          ...position,
+          // Largeur du contenu, bornée : un prénom court garde une carte compacte.
+          width: 'max-content',
+          minWidth: scaled(card.width, zone.width),
+          maxWidth: scaled(maxWidth, zone.width),
+          // Hauteur minimale seulement : un prénom sur deux lignes agrandit la carte.
+          minHeight: scaled(card.height, zone.width),
+          borderLeftColor: slot.color,
+        }}
       >
-        <span class="flex min-w-0 items-center gap-1.5">
-          <span class="size-2.5 shrink-0 rounded-full" style={{ background: slot.color }} />
-          <span class="truncate text-seat-name font-semibold">{slot.name}</span>
-        </span>
+        <span class="line-clamp-2 text-seat-name leading-tight font-semibold hyphens-auto [overflow-wrap:anywhere]">{slot.name}</span>
         {slot.amount !== undefined && <span class="num truncate text-body font-bold">{slot.amount}</span>}
       </button>
     )

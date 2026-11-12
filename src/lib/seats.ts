@@ -66,6 +66,38 @@ export function seatSize(seatedCount: number): Size {
   return seatedCount >= 9 ? { width: 76, height: 54 } : { width: 84, height: 58 }
 }
 
+/** Largeur maximale d'une carte : au-delà, un prénom long passe sur deux lignes. */
+export const SEAT_MAX_WIDTH = 140
+/** Écart minimal entre deux sièges voisins. */
+const SEAT_GAP = 6
+/** Débord toléré hors de la zone (la carte de base déborde déjà un peu aux sièges latéraux). */
+const ZONE_OVERFLOW = 6
+
+/**
+ * Largeur maximale de chaque siège (DESIGN §3) : un siège occupé s'élargit tant qu'il ne touche ni
+ * ses voisins ni le bord de la zone, entre `card.width` et SEAT_MAX_WIDTH. Deux cartes qui se font
+ * face se partagent l'écart à parts égales. `round[i]` = diamètre du siège i s'il est vide (rendu tel
+ * quel), `null` s'il est occupé. Mêmes indices que `seatPositions`.
+ */
+export function seatMaxWidths(round: readonly (number | null)[], orientation: Orientation, card: Size): number[] {
+  const pos = seatPositions(round.length, orientation)
+  const { zone } = tableGeometry(orientation)
+  return round.map((own, i) => {
+    if (own !== null) return own
+    const { x, y } = pos[i]!
+    let w = Math.min(SEAT_MAX_WIDTH, 2 * (x + ZONE_OVERFLOW), 2 * (zone.width - x + ZONE_OVERFLOW))
+    round.forEach((other, j) => {
+      if (j === i) return
+      const dx = Math.abs(pos[j]!.x - x)
+      const dy = Math.abs(pos[j]!.y - y)
+      // Pas de chevauchement vertical possible : ce voisin ne limite pas la largeur.
+      if (dy >= (card.height + (other ?? card.height)) / 2 + SEAT_GAP) return
+      w = Math.min(w, other === null ? dx - SEAT_GAP : 2 * (dx - SEAT_GAP) - other)
+    })
+    return Math.max(card.width, Math.floor(w))
+  })
+}
+
 /** Diamètres des sièges vides (DESIGN §3). */
 export const EMPTY_SEAT_SIZE = 52
 export const HIGHLIGHT_SEAT_SIZE = 68

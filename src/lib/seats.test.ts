@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptySeatCount, fromBottom, seatPositions, seatSize, tableGeometry } from './seats'
+import { SEAT_MAX_WIDTH, emptySeatCount, fromBottom, seatMaxWidths, seatPositions, seatSize, tableGeometry } from './seats'
 
 function close(p: { x: number; y: number }, x: number, y: number) {
   expect(p.x).toBeCloseTo(x, 9)
@@ -65,6 +65,46 @@ describe('tableGeometry', () => {
     for (const g of [p, l]) {
       expect(g.oval.x + g.oval.width / 2).toBe(g.center.x)
       expect(g.oval.y + g.oval.height / 2).toBe(g.center.y)
+    }
+  })
+})
+
+describe('seatMaxWidths', () => {
+  const both = ['portrait', 'landscape'] as const
+
+  it('à 2 joueurs, les deux cartes (haut et bas) ont la largeur maximale', () => {
+    for (const o of both) expect(seatMaxWidths([null, null], o, seatSize(2))).toEqual([SEAT_MAX_WIDTH, SEAT_MAX_WIDTH])
+  })
+
+  it('sièges latéraux limités par le bord de la zone, jamais sous la carte de base', () => {
+    // Portrait, 4 sièges : gauche et droite à 39 unités du bord → 2 × (39 + 6).
+    expect(seatMaxWidths([null, null, null, null], 'portrait', seatSize(4))).toEqual([140, 90, 140, 90])
+    // Paysage : le bord laisserait 72, on garde la carte de base (84).
+    expect(seatMaxWidths([null, null, null, null], 'landscape', seatSize(4))).toEqual([140, 84, 140, 84])
+  })
+
+  it('les sièges vides gardent leur diamètre', () => {
+    const w = seatMaxWidths(fromBottom([null, null, 68, 52, 52, 52]), 'portrait', seatSize(2))
+    expect(w).toEqual([52, 52, 52, 140, 127, 68])
+  })
+
+  it('de 2 à 10 joueurs : bornes, symétrie gauche-droite et aucun chevauchement entre cartes élargies', () => {
+    for (const o of both) {
+      for (let n = 2; n <= 10; n++) {
+        const card = seatSize(n)
+        const w = seatMaxWidths(Array<null>(n).fill(null), o, card)
+        const p = seatPositions(n, o)
+        for (let i = 0; i < n; i++) {
+          expect(w[i]).toBeGreaterThanOrEqual(card.width)
+          expect(w[i]).toBeLessThanOrEqual(SEAT_MAX_WIDTH)
+          expect(w[(n - i) % n]).toBe(w[i])
+          for (let j = i + 1; j < n; j++) {
+            if (w[i] === card.width || w[j] === card.width) continue
+            if (Math.abs(p[i]!.y - p[j]!.y) >= card.height) continue
+            expect(Math.abs(p[i]!.x - p[j]!.x)).toBeGreaterThanOrEqual((w[i]! + w[j]!) / 2)
+          }
+        }
+      }
     }
   })
 })
