@@ -11,13 +11,15 @@ import { PrimaryButton } from '../components/Button'
 import { Header } from '../components/Header'
 import { Table, type SeatSlot } from '../components/Table'
 import { TableCenterAmount } from '../components/TableCenter'
-import { showToast } from '../components/Toast'
+import { UnitToggle } from '../components/UnitToggle'
 import { useOrientation } from '../hooks/useOrientation'
 import { BuyInSheet } from '../sheets/BuyInSheet'
+import { ChipAssistantSheet } from '../sheets/ChipAssistantSheet'
 import { ChipHelpSheet } from '../sheets/ChipHelpSheet'
+import { ConverterSheet } from '../sheets/ConverterSheet'
 import { PlayerSheet } from '../sheets/PlayerSheet'
 
-type Sheet = 'buyIn' | 'player' | 'chipHelp' | null
+type Sheet = 'buyIn' | 'player' | 'chipHelp' | 'assistant' | 'converter' | null
 
 /**
  * Hauteur prise en portrait par tout ce qui n'est pas la table (en-tête, carte buy-in,
@@ -45,15 +47,10 @@ export function Setup() {
     setSheet('player')
   }
 
-  // Branchés à l'étape 8 (assistant SPEC §5, convertisseur SPEC §6).
-  const openAssistant = () => {
-    close()
-    showToast("L'assistant de répartition arrive bientôt.")
-  }
+  const openAssistant = () => setSheet('assistant')
   const openConverter = () => {
-    close()
     setConverterChosen(true)
-    showToast('Le convertisseur arrive bientôt.')
+    setSheet('converter')
   }
 
   const seated = [...players].sort((a, b) => a.seatOrder - b.seatOrder)
@@ -158,7 +155,7 @@ export function Setup() {
       {landscape ? (
         <>
           <div class="flex flex-col gap-3.5">
-            <Header />
+            <Header>{cfg && <UnitToggle />}</Header>
             {buyInCard}
             {actions}
           </div>
@@ -169,9 +166,7 @@ export function Setup() {
         </>
       ) : (
         <>
-          <Header>
-            <span class="text-[13px] text-text-muted">Nouvelle partie</span>
-          </Header>
+          <Header>{cfg ? <UnitToggle /> : <span class="text-[13px] text-text-muted">Nouvelle partie</span>}</Header>
           {buyInCard}
           {table}
           {startHere}
@@ -182,6 +177,8 @@ export function Setup() {
       <BuyInSheet open={sheet === 'buyIn'} onClose={close} />
       <PlayerSheet open={sheet === 'player'} onClose={close} playerId={playerId} />
       <ChipHelpSheet open={sheet === 'chipHelp'} onClose={close} onAssistant={openAssistant} onConverter={openConverter} />
+      <ChipAssistantSheet open={sheet === 'assistant'} onClose={close} />
+      <ConverterSheet open={sheet === 'converter'} onClose={close} />
     </main>
   )
 }

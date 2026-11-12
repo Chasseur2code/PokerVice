@@ -87,7 +87,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - 7b : toast « Annuler », sheet Historique (modifier ou supprimer avec confirmation), réordonnancement par appui long de 400 ms puis échange de sièges, bouton Wake Lock (masqué si l'API n'existe pas, réacquis sur `visibilitychange`).
 - **Vérif** : une partie complète en € sur le téléphone, rechargement en pleine partie avec chrono intact (critères 1 et 2).
 
-### [ ] Étape 8 — Jetons : convertisseur, assistant, unités
+### [x] Étape 8 — Jetons : convertisseur, assistant, unités
 - Convertisseur (SPEC §6) avec une calculatrice ; assistant (SPEC §5) en sheet plein écran : formulaire, proposition modifiable, message d'échec ; bascule segmentée € | Pts | BB dans l'en-tête ; bandeau jetons dépliable ; bouton « Jetons » dans la barre quand il n'y a pas de bandeau ; saisies en points dans les sheets ; verrouillage après « Démarrer ».
 - **Vérif** : une partie avec l'assistant, une partie avec le convertisseur et une partie sans configuration. Dans ce dernier cas, **aucune** mention de jeton ne doit apparaître.
 

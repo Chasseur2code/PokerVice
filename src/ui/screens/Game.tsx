@@ -2,7 +2,7 @@
 // ligne « Partis », barre d'actions. Tout ce qui est affiché se dérive des événements (lib/derive) ;
 // chaque geste appelle une action du store, suivie d'un toast « Annuler ».
 import type { ComponentChildren } from 'preact'
-import { ChevronDown, Clock, Sun, UserPlus } from 'lucide-preact'
+import { ChevronDown, Clock, Coins, Sun, UserPlus } from 'lucide-preact'
 import { useMemo, useState } from 'preact/hooks'
 import { computeStats, summarizePlayers } from '../../lib/derive'
 import { MAX_SEATED } from '../../lib/players'
@@ -10,28 +10,36 @@ import { fromBottom } from '../../lib/seats'
 import { formatAmount } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { IconButton, PrimaryButton } from '../components/Button'
+import { ChipBand } from '../components/ChipBand'
 import { Chrono } from '../components/Chrono'
 import { Header } from '../components/Header'
 import { SignedAmount } from '../components/PlayerDot'
 import { Table, type SeatSlot } from '../components/Table'
 import { TableCenterAmount } from '../components/TableCenter'
 import { showToast } from '../components/Toast'
+import { UnitToggle } from '../components/UnitToggle'
 import { useOrientation } from '../hooks/useOrientation'
 import { useWakeLock, wakeLockSupported } from '../hooks/useWakeLock'
+import { ChipAssistantSheet } from '../sheets/ChipAssistantSheet'
+import { ChipHelpSheet } from '../sheets/ChipHelpSheet'
+import { ChipInfoSheet } from '../sheets/ChipInfoSheet'
+import { ConverterSheet } from '../sheets/ConverterSheet'
 import { HistorySheet } from '../sheets/HistorySheet'
 import { LeftPlayersSheet } from '../sheets/LeftPlayersSheet'
 import { PlayerMenuSheet } from '../sheets/PlayerMenuSheet'
 import { PlayerSheet } from '../sheets/PlayerSheet'
 import { showUndoToast } from '../undo'
 
-type Sheet = 'menu' | 'player' | 'left' | 'history' | null
+type Sheet = 'menu' | 'player' | 'left' | 'history' | 'chipHelp' | 'assistant' | 'converter' | 'chipInfo' | null
 
 /**
  * Hauteur prise en portrait par tout ce qui n'est pas la table (en-tête, stats, barre d'actions,
- * marges), plus la ligne « Partis » quand elle existe : la table rétrécit pour que la barre reste visible.
+ * marges), plus la ligne « Partis » et le bandeau jetons quand ils existent : la table rétrécit
+ * pour que la barre reste visible.
  */
 const PORTRAIT_CHROME = 290
 const LEFT_ROW = 54
+const CHIP_BAND = 54
 const SAFE_Y = 'env(safe-area-inset-top) - env(safe-area-inset-bottom)'
 
 export function Game() {
@@ -103,20 +111,23 @@ export function Game() {
 
   const header = (
     <Header>
-      {wakeLockSupported && (
-        <button
-          type="button"
-          aria-label="Garder l'écran allumé"
-          title="Garder l'écran allumé"
-          aria-pressed={game.wakeLock}
-          onClick={() => gameStore.getState().setWakeLock(!game.wakeLock)}
-          class={`flex size-11 items-center justify-center rounded-full ${
-            game.wakeLock ? 'bg-accent text-on-accent' : 'text-text-muted active:bg-surface-muted'
-          }`}
-        >
-          <Sun size={22} strokeWidth={2} aria-hidden="true" />
-        </button>
-      )}
+      <div class="flex items-center gap-1">
+        {wakeLockSupported && (
+          <button
+            type="button"
+            aria-label="Garder l'écran allumé"
+            title="Garder l'écran allumé"
+            aria-pressed={game.wakeLock}
+            onClick={() => gameStore.getState().setWakeLock(!game.wakeLock)}
+            class={`flex size-11 items-center justify-center rounded-full ${
+              game.wakeLock ? 'bg-accent text-on-accent' : 'text-text-muted active:bg-surface-muted'
+            }`}
+          >
+            <Sun size={22} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+        <UnitToggle />
+      </div>
     </Header>
   )
 
@@ -135,7 +146,11 @@ export function Game() {
     </section>
   )
 
-  const chrome = PORTRAIT_CHROME + (lastLeft ? LEFT_ROW : 0)
+  // Bandeau seulement si les couleurs sont connues (assistant) ; sinon, un bouton « Jetons » dans la barre.
+  const chipColors = cfg?.colors?.length ? [...cfg.colors].sort((a, b) => a.valuePoints - b.valuePoints) : null
+  const chipBand = chipColors && <ChipBand colors={chipColors} onClick={() => setSheet('chipInfo')} />
+
+  const chrome = PORTRAIT_CHROME + (lastLeft ? LEFT_ROW : 0) + (chipBand ? CHIP_BAND : 0)
   const table = (
     <div
       class="mx-auto w-full"
@@ -176,6 +191,11 @@ export function Game() {
       <IconButton label="Historique" onClick={() => setSheet('history')}>
         <Clock size={22} strokeWidth={2} aria-hidden="true" />
       </IconButton>
+      {!chipBand && (
+        <IconButton label="Jetons" onClick={() => setSheet(cfg ? 'converter' : 'chipHelp')}>
+          <Coins size={22} strokeWidth={2} aria-hidden="true" />
+        </IconButton>
+      )}
       <PrimaryButton class="h-[52px]! min-w-0" onClick={finish}>
         Terminer la partie
       </PrimaryButton>
@@ -194,6 +214,7 @@ export function Game() {
             {header}
             {statsCard}
             {leftRow}
+            {chipBand}
             {actions}
           </div>
           <div class="flex flex-col justify-center">{table}</div>
@@ -204,6 +225,7 @@ export function Game() {
           {statsCard}
           {table}
           {leftRow}
+          {chipBand}
           {actions}
         </>
       )}
@@ -220,6 +242,15 @@ export function Game() {
       <PlayerSheet open={sheet === 'player'} onClose={close} playerId={playerId} />
       <LeftPlayersSheet open={sheet === 'left'} onClose={close} />
       <HistorySheet open={sheet === 'history'} onClose={close} />
+      <ChipHelpSheet
+        open={sheet === 'chipHelp'}
+        onClose={close}
+        onAssistant={() => setSheet('assistant')}
+        onConverter={() => setSheet('converter')}
+      />
+      <ChipAssistantSheet open={sheet === 'assistant'} onClose={close} />
+      <ConverterSheet open={sheet === 'converter'} onClose={close} />
+      <ChipInfoSheet open={sheet === 'chipInfo'} onClose={close} />
     </main>
   )
 }
