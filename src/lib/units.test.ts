@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   amountToInput,
+  centsPerPointToInput,
+  converterConfig,
+  formatEuroFraction,
+  parseCount,
+  pointsToBBTenths,
   centsToBB,
   centsToBBTenths,
   centsToPoints,
@@ -131,5 +136,37 @@ describe('saisie dans l’unité courante', () => {
     expect(plain(formatEquivalent(2000, 'eur', cfg)!)).toBe('= 10 000 pts · 100 BB')
     expect(plain(formatEquivalent(2000, 'pts', cfg)!)).toBe('= 20 € · 100 BB')
     expect(formatEquivalent(2000, 'eur', undefined)).toBeUndefined()
+  })
+})
+
+describe('convertisseur simple', () => {
+  it('formate la valeur d’un point, exacte ou approchée', () => {
+    expect(plain(formatEuroFraction({ num: 1, den: 5 }))).toBe('0,002 €')
+    expect(plain(formatEuroFraction({ num: 1, den: 1 }))).toBe('0,01 €')
+    expect(plain(formatEuroFraction({ num: 2500, den: 1 }))).toBe('25,00 €')
+    // 20 € pour 3 000 pts : 2/3 de centime par point.
+    expect(plain(formatEuroFraction({ num: 2, den: 3 }))).toBe('≈ 0,00667 €')
+    expect(plain(formatEuroFraction({ num: 50, den: 3 }))).toBe('≈ 0,167 €')
+  })
+  it('préremplit « 1 point = X € » de façon relisible', () => {
+    for (const s of ['0,002', '0,01', '0,25', '1', '0,0001', '12,5']) {
+      expect(centsPerPointToInput(parseCentsPerPoint(s)!)).toBe(s)
+    }
+    expect(centsPerPointToInput({ num: 2, den: 3 })).toBeNull()
+  })
+  it('crée la configuration : SB = BB / 2, au moins 1 point', () => {
+    expect(converterConfig('0,002', '100')).toEqual(cfg)
+    expect(converterConfig('0,01', '1')?.sbPoints).toBe(1)
+    expect(converterConfig('0,01', '25')?.sbPoints).toBe(12)
+    expect(converterConfig('0', '100')).toBeNull()
+    expect(converterConfig('0,01', '0')).toBeNull()
+    expect(converterConfig('0,01', '1,5')).toBeNull()
+  })
+  it('lit un entier et convertit des points en BB', () => {
+    expect(parseCount('2 350')).toBe(2350)
+    expect(parseCount('-1')).toBeNull()
+    expect(parseCount('')).toBeNull()
+    expect(pointsToBBTenths(2350, cfg)).toBe(235)
+    expect(pointsToBBTenths(55, cfg)).toBe(6)
   })
 })

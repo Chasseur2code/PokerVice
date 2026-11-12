@@ -1,5 +1,5 @@
 // Conversions € ↔ points ↔ BB, exactes grâce à la fraction centimes/point.
-import { centsToInput, divRound, formatCents, parseEuros, type FormatCentsOptions } from './money'
+import { centsToInput, divFloor, divRound, formatCents, parseEuros, type FormatCentsOptions } from './money'
 import type { ChipConfig, Fraction, Unit } from './types'
 
 function gcd(a: number, b: number): number {
@@ -136,4 +136,73 @@ export function formatEquivalent(cents: number, unit: InputUnit, cfg: ChipConfig
   if (!cfg) return undefined
   const other = unit === 'eur' ? formatAmount(cents, 'pts', cfg) : formatCents(cents, { compact: true })
   return `= ${other} · ${formatAmount(cents, 'bb', cfg)}`
+}
+
+/** Plus petit nombre de décimales (≤ 8) qui écrit `cents` (fraction de centimes) exactement en euros, ou `null`. */
+function exactEuroDecimals({ num, den }: Fraction): number | null {
+  for (let d = 0; d <= 8; d++) {
+    const scaled = num * 10 ** d
+    if (!Number.isSafeInteger(scaled)) return null
+    if (scaled % (den * 100) === 0) return d
+  }
+  return null
+}
+
+const euroFractionFormatters = new Map<number, Intl.NumberFormat>()
+
+/**
+ * Montant en euros d'une fraction de centimes (valeur d'un point ou d'un jeton) :
+ * « 0,002 € » si l'écriture est exacte, sinon « ≈ 0,00667 € » (3 chiffres significatifs au moins).
+ */
+export function formatEuroFraction(cents: Fraction): string {
+  const exact = exactEuroDecimals(cents)
+  let decimals = Math.max(2, exact ?? 2)
+  let scaled: number
+  if (exact !== null) {
+    scaled = (cents.num * 10 ** decimals) / (cents.den * 100)
+  } else {
+    // On ajoute des décimales tant que le montant a moins de 3 chiffres significatifs.
+    while (decimals < 8 && Math.abs(divRound(cents.num * 10 ** decimals, cents.den * 100)) < 100) decimals += 1
+    scaled = divRound(cents.num * 10 ** decimals, cents.den * 100)
+  }
+  let f = euroFractionFormatters.get(decimals)
+  if (!f) {
+    f = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: decimals })
+    euroFractionFormatters.set(decimals, f)
+  }
+  // Division pour l'affichage seulement.
+  return `${exact === null ? '≈ ' : ''}${f.format(scaled / 10 ** decimals)}`
+}
+
+/** Valeur initiale du champ « 1 point = X € » (inverse de parseCentsPerPoint), ou `null` si non décimale. */
+export function centsPerPointToInput(cents: Fraction): string | null {
+  const d = exactEuroDecimals(cents)
+  if (d === null) return null
+  const scaled = (cents.num * 10 ** d) / (cents.den * 100)
+  const s = String(scaled).padStart(d + 1, '0')
+  return d === 0 ? s : `${s.slice(0, -d)},${s.slice(-d)}`
+}
+
+/** Points → dixièmes de BB arrondis, sans passer par les centimes (calculatrice du convertisseur). */
+export function pointsToBBTenths(points: number, cfg: ChipConfig): number {
+  return divRound(points * 10, cfg.bbPoints)
+}
+
+/** Nombre entier positif ou nul saisi en texte (« 2 350 ») ; `null` si invalide. */
+export function parseCount(input: string): number | null {
+  const s = input.replace(/[\s  ]/g, '')
+  if (!/^\d+$/.test(s)) return null
+  const n = Number(s)
+  return Number.isSafeInteger(n) ? n : null
+}
+
+/**
+ * Configuration du convertisseur simple (SPEC §6) : « 1 point = X € » et « BB = Y points ».
+ * La SB vaut la moitié de la BB (au moins 1 point). `null` si une saisie est invalide.
+ */
+export function converterConfig(euroPerPointInput: string, bbPointsInput: string): ChipConfig | null {
+  const centsPerPoint = parseCentsPerPoint(euroPerPointInput)
+  const bbPoints = parseCount(bbPointsInput)
+  if (!centsPerPoint || !bbPoints) return null
+  return { mode: 'converter', centsPerPoint, bbPoints, sbPoints: Math.max(1, divFloor(bbPoints, 2)) }
 }

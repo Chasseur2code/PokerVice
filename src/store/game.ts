@@ -84,8 +84,11 @@ export interface GameActions {
    * Échanger A et B : `reorderSeats([B, A])` ; une permutation complète marche aussi.
    */
   reorderSeats(playerIds: readonly string[]): boolean
-  /** Possible avant « Démarrer », ou après s'il n'y a pas encore de configuration (SPEC §2.2). */
-  setChipConfig(cfg: ChipConfig | undefined): boolean
+  /**
+   * Possible avant « Démarrer », ou après s'il n'y a pas encore de configuration (SPEC §2.2).
+   * `buyInCents` change aussi le buy-in commun dans la même action (buy-in saisi dans l'assistant).
+   */
+  setChipConfig(cfg: ChipConfig | undefined, buyInCents?: number): boolean
   start(): boolean
   rebuy(playerId: string, cents: number): boolean
   leave(playerId: string, stackCents: number): boolean
@@ -133,6 +136,16 @@ function isValidChipConfig(cfg: ChipConfig): boolean {
     Number.isSafeInteger(cfg.bbPoints) && cfg.bbPoints > 0 &&
     Number.isSafeInteger(cfg.sbPoints) && cfg.sbPoints > 0 && cfg.sbPoints <= cfg.bbPoints
   )
+}
+
+/**
+ * Configuration de l'assistant : le stack de départ vaut le buy-in, donc 1 pt = buy-in ÷ stack.
+ * Changer le buy-in avant « Démarrer » change la valeur du point, pas les jetons.
+ */
+function rescaleToBuyIn(cfg: ChipConfig | undefined, buyInCents: number): ChipConfig | undefined {
+  if (cfg?.mode !== 'assistant' || !cfg.colors?.length) return cfg
+  const stack = cfg.colors.reduce((s, c) => s + c.valuePoints * c.perPlayer, 0)
+  return stack > 0 ? { ...cfg, centsPerPoint: fraction(buyInCents, stack) } : cfg
 }
 
 function event(type: GameEventType, playerId: string, amountCents: number, at: number): GameEvent {
@@ -194,7 +207,9 @@ export function createGameStore(storage: StateStorage) {
           setBuyIn(cents) {
             const game = openGame()
             if (!game || !isCents(cents, false)) return false
-            commit('setBuyIn', { game: { ...game, defaultBuyInCents: cents } })
+            // Une fois la partie démarrée, la configuration jetons est verrouillée : on n'y touche plus.
+            const chipConfig = game.status === 'setup' ? rescaleToBuyIn(game.chipConfig, cents) : game.chipConfig
+            commit('setBuyIn', { game: { ...game, defaultBuyInCents: cents, chipConfig } })
             return true
           },
 
@@ -246,13 +261,14 @@ export function createGameStore(storage: StateStorage) {
             return true
           },
 
-          setChipConfig(cfg) {
+          setChipConfig(cfg, buyInCents) {
             const game = openGame()
-            if (!game) return false
+            if (!game || (buyInCents !== undefined && !isCents(buyInCents, false))) return false
             // Verrouillée dès « Démarrer » : en cours de partie, on peut seulement en créer une.
             if (game.status === 'running' && (game.chipConfig || !cfg)) return false
             if (cfg && !isValidChipConfig(cfg)) return false
-            commit('setChipConfig', { game: { ...game, chipConfig: cfg }, unit: cfg ? get().unit : 'eur' })
+            const defaultBuyInCents = buyInCents ?? game.defaultBuyInCents
+            commit('setChipConfig', { game: { ...game, chipConfig: cfg, defaultBuyInCents }, unit: cfg ? get().unit : 'eur' })
             return true
           },
 

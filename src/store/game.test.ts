@@ -148,6 +148,37 @@ describe('configuration jetons', () => {
     expect(s().setChipConfig({ ...cfg, sbPoints: 100 })).toBe(true)
   })
 
+  it('enregistre la configuration et le buy-in de l’assistant en une seule action', () => {
+    expect(s().setChipConfig(cfg, 2500)).toBe(true)
+    expect(s().game.defaultBuyInCents).toBe(2500)
+    expect(s().setChipConfig(cfg, 0)).toBe(false)
+    s().undo()
+    expect(s().game.defaultBuyInCents).toBe(2000)
+    expect(s().game.chipConfig).toBeUndefined()
+  })
+
+  it('le buy-in modifié avant « Démarrer » change la valeur du point de l’assistant', () => {
+    // Stack de 2 000 pts (20 × 25 + 15 × 100) pour 20 € : 1 pt = 1 centime.
+    const colors = [
+      { id: 'w', name: 'Blanc', hex: '#FFFFFF', valuePoints: 25, perPlayer: 20, totalQty: 200 },
+      { id: 'r', name: 'Rouge', hex: '#D63A3A', valuePoints: 100, perPlayer: 15, totalQty: 200 },
+    ]
+    const assistant: ChipConfig = { mode: 'assistant', centsPerPoint: { num: 1, den: 1 }, bbPoints: 50, sbPoints: 25, colors }
+    setupThree()
+    s().setChipConfig(assistant)
+    s().setBuyIn(1000)
+    expect(s().game.chipConfig?.centsPerPoint).toEqual({ num: 1, den: 2 })
+    // Le convertisseur garde sa valeur du point ; après « Démarrer », plus rien ne bouge.
+    s().setBuyIn(3000)
+    s().start()
+    s().setBuyIn(4000)
+    expect(s().game.chipConfig?.centsPerPoint).toEqual({ num: 3, den: 2 })
+    s().newGame()
+    s().setChipConfig(cfg)
+    s().setBuyIn(1000)
+    expect(s().game.chipConfig?.centsPerPoint).toEqual(cfg.centsPerPoint)
+  })
+
   it('les unités Pts et BB exigent une configuration', () => {
     expect(s().setUnit('pts')).toBe(false)
     s().setChipConfig(cfg)
