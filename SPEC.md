@@ -157,7 +157,8 @@ L'algorithme cherche la répartition qui permet à **chaque joueur de miser n'im
 - assez de jetons de la plus petite valeur par joueur pour payer les blinds plusieurs fois et faire l'appoint (ordre de grandeur : au moins 10). **Contrainte souple** : 8 conseillés, 5 au minimum ; entre les deux, la répartition est proposée avec un avertissement plutôt que refusée ;
 - un écart raisonnable entre deux valeurs successives (rapport de 2 à 5, idéalement) ;
 - pour chaque valeur, assez de jetons de la valeur inférieure pour faire la monnaie ;
-- le moins possible de jetons de forte valeur dans le stack de départ.
+- le moins possible de jetons de forte valeur dans le stack de départ ;
+- pas de piles inutiles. Si la couleur suivante vaut r fois plus, r − 1 jetons suffisent pour composer tout montant et 2r permettent de payer deux fois sans faire la monnaie. On ne pénalise donc rien jusqu'à 2r jetons, on pénalise légèrement jusqu'à 3r et fortement au-delà. Pour la plus petite et la plus grosse couleur, ces seuils sont d'au moins 10 et 15 (la plus petite paie aussi les blinds ; la plus grosse porte la valeur en quelques jetons). 20 jetons d'une couleur au maximum.
 
 Les couleurs les plus nombreuses reçoivent en priorité les plus petites valeurs. La recherche peut être exhaustive (l'espace est petit : 7 couleurs au plus) avec une fonction de score. L'implémentation est à préciser en mode plan.
 

@@ -120,10 +120,18 @@ const SB_CANDIDATES = [1, 2, 5, 10, 25, 50, 100]
 const W_CHIP = 1 // chaque jeton dans le stack (un stack énorme est peu pratique)
 const W_SMALL_MISSING = 12 // par petit jeton manquant sous TARGET_SMALL_CHIPS
 const W_SMALL_SCARCE = 30 // en plus, par petit jeton manquant sous SMALL_CHIPS_ADVISED (contrainte souple)
-const W_SMALL_BONUS = 0.6 // par petit jeton jusqu'à SMALL_BONUS_CAP (liquidité)
-const SMALL_BONUS_CAP = 20
+const W_SMALL_BONUS = 0.6 // par petit jeton jusqu'à la fin de sa zone libre (liquidité)
 const W_CHANGE = 4 // par « monnaie » manquante (on vise 2 jetons changés avec la couleur juste en dessous)
 const W_BIG = 25 // part du stack × log2(valeur) : peu de valeur dans les gros jetons
+// Nombre par couleur, selon le rapport r avec la couleur suivante (r − 1 jetons suffisent pour composer
+// tout montant ; 2r permettent de payer deux fois sans faire la monnaie) : libre jusqu'à 2r, pénalité
+// légère jusqu'à 3r, forte au-delà. La plus petite couleur paie aussi les blinds : zone libre d'au moins
+// EDGE_LIGHT_FROM, pénalité forte au-delà de EDGE_HEAVY_FROM au plus tôt. La plus grosse n'a pas de couleur
+// au-dessus : elle porte la valeur en quelques jetons, zone fixe EDGE_LIGHT_FROM / EDGE_HEAVY_FROM.
+const W_OVER_2R = 2 // par jeton au-delà de 2r
+const W_OVER_3R = 15 // en plus, par jeton au-delà de 3r
+const EDGE_LIGHT_FROM = TARGET_SMALL_CHIPS
+const EDGE_HEAVY_FROM = 15
 /** Au-delà, une pile d'une seule couleur devient encombrante (même si le stock le permet). */
 export const MAX_PER_COLOR = 20
 
@@ -229,15 +237,21 @@ function bestComposition(units: number[], caps: number[], target: number): { pen
     const pick = new Int32Array(target + 1)
     const maxC = Math.min(caps[i]!, MAX_PER_COLOR, Math.floor(target / w))
     const minC = i === 0 ? MIN_SMALL_CHIPS : 1
+    // Zone libre jusqu'à `light`, pénalité légère jusqu'à `heavy`, forte au-delà (r = 0 : plus grosse couleur).
+    const r = i + 1 < k ? units[i + 1]! / w : 0
+    const edge = i === 0 || r === 0
+    const light = edge ? Math.max(2 * r, EDGE_LIGHT_FROM) : 2 * r
+    const heavy = edge ? Math.max(3 * r, EDGE_HEAVY_FROM) : 3 * r
     // Coût de c jetons de cette couleur, indépendant du montant cumulé.
     const cost = new Float64Array(maxC + 1)
     for (let c = minC; c <= maxC; c++) {
       let p = W_CHIP * c + (W_BIG * c * w * logs[i]!) / target
       if (i === 0) {
-        p += W_SMALL_MISSING * Math.max(0, TARGET_SMALL_CHIPS - c) - W_SMALL_BONUS * Math.min(c, SMALL_BONUS_CAP)
+        p += W_SMALL_MISSING * Math.max(0, TARGET_SMALL_CHIPS - c) - W_SMALL_BONUS * Math.min(c, light)
         p += W_SMALL_SCARCE * Math.max(0, SMALL_CHIPS_ADVISED - c)
       }
       if (i + 1 < k) p += W_CHANGE * Math.max(0, 2 - (c * w) / units[i + 1]!)
+      p += W_OVER_2R * Math.max(0, c - light) + W_OVER_3R * Math.max(0, c - heavy)
       cost[c] = p
     }
     for (let a = 0; a <= target; a++) {

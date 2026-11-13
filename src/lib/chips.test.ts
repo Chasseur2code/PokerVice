@@ -89,6 +89,17 @@ describe('proposeChips — cas réalistes à 100 BB (critère 6)', () => {
     expect(used[used.length - 1]!.valuePoints).toBeLessThanOrEqual(10 * summary.bbPoints)
   })
 
+  it.each([4, 6, 8, 10])('mallette 300/200/100/100/50, %i joueurs : aucune pile au-delà de 3r, 30 jetons au plus', (players) => {
+    // Avant les zones 2r / 3r : 20×1 + 20×5 + 8×10 (48 jetons).
+    const { used, summary } = expectValid(input([300, 200, 100, 100, 50], { maxPlayers: players }))
+    used.forEach((c, i) => {
+      const next = used[i + 1]
+      const bound = !next ? 15 : i === 0 ? Math.max(15, (3 * next.valuePoints) / c.valuePoints) : (3 * next.valuePoints) / c.valuePoints
+      expect(c.perPlayer).toBeLessThanOrEqual(bound)
+    })
+    expect(summary.chipsPerPlayer).toBeLessThanOrEqual(30)
+  })
+
   it('autres profondeurs et buy-in non rond', () => {
     expectValid(input([150, 150, 100, 50, 50], { depthBB: 50 }))
     expectValid(input([150, 150, 100, 50, 50], { depthBB: 200 }))
