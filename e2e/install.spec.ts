@@ -1,4 +1,4 @@
-// Bandeau d'installation sur l'écran d'accueil : affiché au premier lancement sur smartphone, fermé pour de bon.
+// Bandeau d'installation sur l'écran d'accueil : affiché à chaque visite sur smartphone, la croix le cache pour la visite.
 import { expect, test } from '@playwright/test'
 
 const banner = (page: import('@playwright/test').Page) => page.getByRole('complementary', { name: "Installer l'application" })
@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await page.reload()
 })
 
-test("bandeau d'installation : visible au premier lancement, ne revient pas une fois fermé", async ({ page }) => {
+test("bandeau d'installation : visible, caché par la croix, de retour à la visite suivante", async ({ page }) => {
   await expect(banner(page)).toContainText('plein écran, hors connexion')
   // Le bouton « Démarrer la partie » reste visible sans défiler.
   await expect(page.getByRole('button', { name: 'Démarrer la partie' })).toBeInViewport()
@@ -17,8 +17,7 @@ test("bandeau d'installation : visible au premier lancement, ne revient pas une 
   await banner(page).getByRole('button', { name: 'Fermer' }).click()
   await expect(banner(page)).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Démarrer la partie' })).toBeVisible()
-  await expect(banner(page)).toHaveCount(0)
+  await expect(banner(page)).toBeVisible()
 })
 
 test("bandeau d'installation : absent sur ordinateur", async ({ browser, baseURL }) => {

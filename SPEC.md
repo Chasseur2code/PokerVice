@@ -90,7 +90,7 @@ Arrivée sur le site
 L'écran doit guider sans texte superflu. **Aucune stat n'est affichée** (elles vaudraient toutes zéro).
 De haut en bas :
 1. **En-tête** : logo « PokerVice ».
-   - **Bandeau d'installation** (smartphone, dans le navigateur, tant qu'il n'a pas été fermé) : « Installez l'app : plein écran, hors connexion ». Bouton « Installer » si le navigateur le permet (Chrome Android), sinon le geste à faire (iOS : Partager → « Sur l'écran d'accueil » ; autres : menu du navigateur). Une croix le ferme pour de bon sur l'appareil ; il disparaît aussi une fois l'app installée.
+   - **Bandeau d'installation** (smartphone, dans le navigateur, à chaque visite) : « Installez l'app : plein écran, hors connexion ». Bouton « Installer » si le navigateur le permet (Chrome Android), sinon le geste à faire (iOS : Partager → « Sur l'écran d'accueil » ; autres : menu du navigateur). Une croix le cache jusqu'à la prochaine visite ; il disparaît aussi dès que l'app est installée.
 2. **Carte buy-in** : « Buy-in par joueur : 10 € » (10 € par défaut, puis le dernier buy-in utilisé), avec un bouton « Modifier ».
 3. **La table** : sièges vides « + » en pointillés. Le siège du bas (le plus proche du pouce) est **mis en avant** avec la couleur d'accent et la mention « Commencez ici », qui disparaît dès le premier joueur ajouté. Au centre : « Installez vos joueurs » et « Touchez un siège + pour ajouter quelqu'un. »
 4. **Lien discret** « Besoin d'aide pour les jetons ? » (voir §3, §5, §6).

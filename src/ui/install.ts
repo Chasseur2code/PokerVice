@@ -1,6 +1,6 @@
 // Invitation à installer l'app sur l'écran d'accueil (bandeau `InstallBanner`). Seulement sur smartphone,
-// dans le navigateur (pas déjà installée), tant que le bandeau n'a pas été fermé. Préférence de l'appareil,
-// gardée à part de la partie (clé `pokervice-install`), comme le thème.
+// dans le navigateur (pas dans l'app installée), à chaque visite : la croix ne le cache que jusqu'au
+// prochain chargement de la page, rien n'est enregistré.
 //
 // Trois cas selon le navigateur :
 // - Chrome, Edge, Samsung Internet (Android) : ils émettent `beforeinstallprompt`, qu'on garde pour ouvrir
@@ -10,8 +10,6 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-const KEY = 'pokervice-install'
-
 /** Événement non standard de Chromium (absent des types du DOM). */
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -19,14 +17,6 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export type InstallMode = 'prompt' | 'ios' | 'menu'
-
-function dismissed(): boolean {
-  try {
-    return localStorage.getItem(KEY) === 'dismissed'
-  } catch {
-    return false
-  }
-}
 
 function standalone(): boolean {
   return (
@@ -42,7 +32,7 @@ const mobile = () => matchMedia('(pointer: coarse) and (hover: none)').matches
 const ios = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
 const installStore = createStore<{ visible: boolean; deferred: BeforeInstallPromptEvent | null }>(() => ({
-  visible: mobile() && !standalone() && !dismissed(),
+  visible: mobile() && !standalone(),
   deferred: null,
 }))
 
@@ -54,13 +44,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
 })
 window.addEventListener('appinstalled', () => dismissInstall())
 
-/** Ferme le bandeau pour de bon sur cet appareil. */
+/** Cache le bandeau jusqu'au prochain chargement de la page. */
 export function dismissInstall(): void {
-  try {
-    localStorage.setItem(KEY, 'dismissed')
-  } catch {
-    // Stockage indisponible (navigation privée) : fermé pour la session.
-  }
   installStore.setState({ visible: false, deferred: null })
 }
 
