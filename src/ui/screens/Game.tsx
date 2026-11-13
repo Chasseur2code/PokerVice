@@ -187,8 +187,10 @@ export function Game() {
     </button>
   )
 
+  // En paysage, la colonne de 280 px laisse trop peu de place au bouton principal à côté des icônes :
+  // il passe sur sa propre ligne.
   const actions = (
-    <div class="mt-auto flex gap-2.5 pt-1">
+    <div class={`mt-auto flex gap-2.5 pt-1 ${landscape ? 'flex-wrap' : ''}`}>
       <IconButton label="Ajouter un joueur" onClick={addPlayer}>
         <UserPlus size={22} strokeWidth={2} aria-hidden="true" />
       </IconButton>
@@ -200,7 +202,7 @@ export function Game() {
           <Coins size={22} strokeWidth={2} aria-hidden="true" />
         </IconButton>
       )}
-      <PrimaryButton class="h-[52px]! min-w-0" onClick={() => setSheet('finish')}>
+      <PrimaryButton class={`h-[52px]! min-w-0 ${landscape ? 'basis-full' : ''}`} onClick={() => setSheet('finish')}>
         Terminer la partie
       </PrimaryButton>
     </div>

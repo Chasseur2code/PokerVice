@@ -95,7 +95,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - Confirmation, puis saisie joueur par joueur (progression « 3 / 6 », « Reste à attribuer » en vert ou rouge), carte d'écart avec Corriger, Prorata et Imputer à…, récap (balances triées avec le signe, virements, interrupteur « Arrondir à l'euro », stats et historique repliables), `lib/recapText.ts` au format exact de SPEC §8.3 avec copie dans le presse-papiers, « Nouvelle partie » avec confirmation, partie non rouvrable.
 - **Vérif** : test unitaire du texte WhatsApp ; un joueur parti avant la fin apparaît dans les virements (critère 3).
 
-### [ ] Étape 10 — PWA, responsive, finitions, mise en ligne
+### [x] Étape 10 — PWA, responsive, finitions, mise en ligne
 - `vite-plugin-pwa` : manifest « PokerVice », icônes 192, 512 et maskable, cache hors ligne de tout le build.
 - Paysage et ordinateur : ovale horizontal, stats dans une colonne de 280 px. `prefers-reduced-motion`, `aria-label` sur les sièges et les icônes, contraste vérifié, zones de sécurité (safe-area).
 - Performance : Lighthouse mobile ; test avec 10 joueurs et plus de 50 événements (pas de re-rendu de toute la table à chaque tic du chrono : le chrono a son propre composant).

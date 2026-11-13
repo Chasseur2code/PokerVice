@@ -258,4 +258,9 @@
   .toast[data-open] {
     transform: none;
   }
+  /* Le siège soulevé suit toujours le doigt (c'est le geste lui-même), mais sans zoom. */
+  .seat:active,
+  .seat[data-lifted] {
+    scale: none;
+  }
 }

@@ -11,12 +11,14 @@ Documents de référence (à lire avant toute tâche) :
 - Synthèse (le pourquoi, décisions, points ouverts) : `C:\Users\matth\Documents\Vault\Perso\02-Projets\pokervice\synthese.md`.
 
 ## État
-La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : lire `PLAN.md`, annoncer le sous-plan, exécuter, terminer par `npm run test` + `npm run build` verts, cocher l'étape dans `PLAN.md`, mettre à jour cette section, commit. Étapes 0 à 9 faites (`lib/` testé ; store ; composants ; écrans `Setup`, `Game`, `EndGame`, `Recap` + sheets ; jetons). Prochaine étape : **10 (PWA, responsive, finitions, Playwright)**. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`).
+Les 11 étapes de `PLAN.md` sont faites (v1 complète : PWA installable et hors ligne, tests Vitest + Playwright, Lighthouse mobile 100/100/100). Reste à faire par Matthieu : installation sur le téléphone, essai en mode avion, puis les points ouverts de la synthèse. Dépôt `Chasseur2code/PokerVice` (public), site en ligne : https://chasseur2code.github.io/PokerVice/ (redéployé à chaque push sur `main`). Avant de commit : `npm run test`, `npm run build` et `npm run test:e2e` verts.
 
 ## Commandes
 - `npm run dev` (localhost:5173), `npm run dev:lan` (téléphone en wifi), `npm run build` (`tsc -b` puis `vite build`), `npm run preview`
 - `npm run test`, `npm run test:watch`, `npm run typecheck`
 - Test isolé : `npx vitest run src/lib/settlement.test.ts -t "nom du test"`
+- `npm run test:e2e` : Playwright sur le build (`vite preview` port 4173, lancé par la config), avec le Chrome installé (`channel: 'chrome'`). Tests dans `e2e/`. Une partie se prépare en écrivant `localStorage['pokervice'] = { state: { game, lastRecap, unit }, version: 1 }`.
+- `npm run icons` : régénère les PNG de la PWA (`scripts/icons.mjs`, sans dépendance).
 
 ## Pièges et conventions
 - Node 26 ARM64 dans `C:\Program Files\nodejs`. Dans le shell Bash de Claude, il peut manquer au PATH : préfixer `export PATH="/c/Program Files/nodejs:$PATH" &&`.
@@ -29,6 +31,7 @@ La construction suit **`PLAN.md`** (étapes 0 à 10). Une session par étape : l
 - Jetons : `setChipConfig(cfg, buyInCents?)` (buy-in de l'assistant dans la même action) ; `setBuyIn` en préparation recalcule le point d'une config assistant (stack de départ = buy-in). Valeur d'un point ou d'un jeton en € : `formatEuroFraction` (« ≈ » si non décimal). Palette des jetons dans `lib/chipColors.ts`, pastille `ChipDot`. Bandeau (`ChipBand`) seulement si `cfg.colors` ; sinon bouton « Jetons » dans la barre (aide Oui/Non sans config, convertisseur en lecture seule + calculatrice avec config).
 - Fin de partie : `Game` affiche `EndGame` (état local `ending`) ; les stacks saisis restent locaux jusqu'à `finish`. L'écart et la validité d'un prorata ou d'une imputation se calculent avec `previewFinalBalances` (même logique que `finish`). Le récap (`lib/recap.ts`, `lib/recapText.ts`) est **toujours en €**, sans bascule d'unité. Partage : `ui/share.ts` (`navigator.share`, sinon copie avec repli `execCommand` ; en http sur le wifi, ni partage ni presse-papiers moderne). Les sheets bloquent le défilement par un compteur (`lockScroll`), pas en sauvegardant `overflow` (les sheets se chevauchent pendant les transitions). Confirmations via `ConfirmSheet`.
 - Preact : attribut `class` (pas `className`) ; `react` est aliasé vers `preact/compat` dans `tsconfig.app.json`.
+- PWA : `vite-plugin-pwa` (`generateSW`, `autoUpdate`) dans `vite.config.ts` ; le glob ne prend que js/css/html/woff2 (icônes du manifest et `includeAssets` ajoutés par le plugin, sinon doublons). Dans Git Bash, `BASE_PATH=/PokerVice/` est réécrit en chemin Windows : préfixer `MSYS_NO_PATHCONV=1`.
 - `base` de Vite vient de `BASE_PATH` (fourni par `.github/workflows/deploy.yml` = `/<nom-du-dépôt>/`), `/` en local.
 
 ## Architecture visée (SPEC §10)

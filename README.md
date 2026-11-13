@@ -25,6 +25,14 @@ npm run dev:lan    # accessible depuis le téléphone sur le même wifi (adresse
 | `npm run preview` | Sert `dist/` localement, comme en production |
 | `npm run test` / `test:watch` | Tests Vitest (une fois / en continu) |
 | `npm run typecheck` | Vérification TypeScript seule |
+| `npm run test:e2e` | Tests Playwright de bout en bout sur le build (parcours complet, hors ligne, aucune requête tierce, performance) |
+| `npm run icons` | Régénère les icônes PNG de la PWA dans `public/` à partir du dessin de `scripts/icons.mjs` |
+
+Playwright utilise le Google Chrome installé sur la machine (`channel: 'chrome'` sous Windows) ; ailleurs, `npx playwright install chromium`.
+
+## Installer sur le téléphone
+
+Ouvrir https://chasseur2code.github.io/PokerVice/ puis « Ajouter à l'écran d'accueil » (Chrome Android : menu ⋮ → Installer l'application ; Safari iOS : Partager → Sur l'écran d'accueil). Après une première visite, l'app marche sans réseau : le service worker sert le build depuis son cache. Une nouvelle version se télécharge en arrière-plan et s'applique au lancement suivant ; la partie en cours, dans `localStorage`, n'est pas touchée.
 
 ## Déploiement
 
@@ -42,7 +50,8 @@ Configuration unique sur GitHub : *Settings → Pages → Build and deployment �
 | Styles | Tailwind CSS v4, tokens de design dans `@theme` ([src/styles/index.css](src/styles/index.css)) |
 | Polices | Fraunces et Inter via fontsource (woff2 auto-hébergés) |
 | Icônes | lucide-preact |
-| Tests | Vitest (logique), Playwright (parcours complet, plus tard) |
+| PWA | vite-plugin-pwa (manifest, service worker Workbox qui précache tout le build) |
+| Tests | Vitest (logique et store), Playwright (parcours complet sur le build) |
 
 ## Architecture
 
