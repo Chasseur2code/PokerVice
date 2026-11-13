@@ -173,7 +173,9 @@ describe('convertisseur simple', () => {
     expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 50)).toBe(40)
     expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 150)).toBe(13) // 13,33 arrondi
     expect(bbPointsForDepth(2000, { num: 1, den: 5 }, 100)).toBe(100) // 1 pt = 0,002 €
-    expect(bbPointsForDepth(100, { num: 100, den: 1 }, 200)).toBe(1) // jamais 0
+    // Buy-in de 2 000 pts : profondeur 2 000 → BB 1 pt ; au-delà, la BB ferait moins d'un point.
+    expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 2000)).toBe(1)
+    expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 2001)).toBeNull()
   })
   it('déduit la profondeur de la BB (inverse)', () => {
     expect(depthForBbPoints(2000, { num: 1, den: 1 }, 20)).toBe(100)

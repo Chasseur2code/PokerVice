@@ -69,8 +69,8 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
 
   // Buy-in = profondeur × BB × valeur du point : la profondeur est l'intention, la BB s'en déduit.
   // Changer la profondeur recalcule la BB ; changer la BB à la main recalcule la profondeur. Changer la valeur
-  // du point recalcule la BB depuis la profondeur, ou la profondeur depuis la BB si la profondeur n'est pas valide
-  // (par exemple vidée parce que la BB a été saisie pendant que le champ € était invalide).
+  // du point garde la BB (elle correspond à de vrais jetons) et recalcule la profondeur ; sans BB valide,
+  // c'est la BB qui est recalculée depuis la profondeur.
   const syncBB = (cppInput: string, depthInput: string) => {
     const cpp = parseConverterPoint(cppInput)
     const d = parseDepth(depthInput)
@@ -86,8 +86,8 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
   }
   const onEuroPerPoint = (v: string) => {
     setEuroPerPoint(v)
-    if (parseDepth(depth)) syncBB(v, depth)
-    else syncDepth(v, bbPoints)
+    if (parseBbPoints(bbPoints)) syncDepth(v, bbPoints)
+    else syncBB(v, depth)
   }
   const onDepth = (v: string) => {
     setDepth(v)
@@ -98,7 +98,10 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
     syncDepth(euroPerPoint, v)
   }
 
-  const depthInvalid = depth.trim() !== '' && !parseDepth(depth)
+  // Invalide aussi si elle dépasse le buy-in en points : la BB ferait moins d'un point.
+  const cpp = parseConverterPoint(euroPerPoint)
+  const depthN = parseDepth(depth)
+  const depthInvalid = depth.trim() !== '' && (!depthN || (!!cpp && bbPointsForDepth(buyIn, cpp, depthN) === null))
   const draft: ChipConfig | null = locked ? cfg! : depthInvalid ? null : converterConfig(euroPerPoint, bbPoints)
   const result = draft ? calcResult(calc, calcUnit, draft) : undefined
 

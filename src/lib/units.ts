@@ -239,11 +239,14 @@ function safeDivRound(a: number, b: number): number | null {
 
 /**
  * BB en points pour qu'un buy-in fasse `depthBB` big blinds (convertisseur) : buy-in ÷ profondeur ÷ valeur du point,
- * arrondie au point le plus proche (au moins 1). `null` si le calcul déborde.
+ * arrondie au point le plus proche. `null` si le calcul déborde ou si la profondeur dépasse le buy-in en points
+ * (la BB ferait moins d'un point).
  */
 export function bbPointsForDepth(buyInCents: number, centsPerPoint: Fraction, depthBB: number): number | null {
-  const bb = safeDivRound(buyInCents * centsPerPoint.den, centsPerPoint.num * depthBB)
-  return bb === null ? null : Math.max(1, bb)
+  const a = buyInCents * centsPerPoint.den
+  const b = centsPerPoint.num * depthBB
+  if (Number.isSafeInteger(a) && Number.isSafeInteger(b) && a < b) return null
+  return safeDivRound(a, b)
 }
 
 /** Profondeur (BB par buy-in, arrondie, peut valoir 0) pour une BB donnée : inverse de bbPointsForDepth. */
