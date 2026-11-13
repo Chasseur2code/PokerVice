@@ -137,6 +137,7 @@ Sur un écran de 390 px de large, la zone de la table mesure **358 × 460 px**. 
 ### 4.1 Premier lancement (avant « Démarrer ») — maquette « Main »
 De haut en bas, dans une colonne flex :
 1. **En-tête** (40 px) : logo à gauche ; à droite, la bascule d'unité s'il existe une configuration jetons, sinon rien.
+   - **Bandeau d'installation** (voir SPEC §4.0), juste dessous : carte comme celle du buy-in (`--surface`, rayon 16), titre 14 px / 600, consigne 13 px muted ; à droite, « Installer » en pilule ambre de 44 px (si disponible) et une croix 44 × 44. En paysage, dans la colonne de gauche. La table rétrécit d'autant en portrait.
 2. **Carte buy-in** (`--surface`, rayon 16, padding 14 × 16) :
    - à gauche, le libellé « Buy-in par joueur » (13 px muted) et la valeur « 10 € » en Fraunces 28 ;
    - à droite, un bouton « Modifier » en pilule de 44 px de haut, fond `--bg`, bordure `--border-strong`. Il ouvre une bottom sheet de saisie.

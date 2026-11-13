@@ -9,10 +9,12 @@ import { emptySeatCount, fromBottom } from '../../lib/seats'
 import { gameStore, useGame } from '../../store/useGame'
 import { PrimaryButton } from '../components/Button'
 import { Header } from '../components/Header'
+import { InstallBanner } from '../components/InstallBanner'
 import { Table, type SeatSlot } from '../components/Table'
 import { TableCenterAmount } from '../components/TableCenter'
 import { UnitToggle } from '../components/UnitToggle'
 import { useOrientation } from '../hooks/useOrientation'
+import { useInstall } from '../install'
 import { BuyInSheet } from '../sheets/BuyInSheet'
 import { ChipAssistantSheet } from '../sheets/ChipAssistantSheet'
 import { ChipHelpSheet } from '../sheets/ChipHelpSheet'
@@ -27,6 +29,8 @@ type Sheet = 'buyIn' | 'player' | 'chipHelp' | 'assistant' | 'converter' | null
  * « Commencez ici », lien, bouton, marges) : la table rétrécit pour que le bouton reste visible.
  */
 const PORTRAIT_CHROME = '330px'
+/** En plus, quand le bandeau d'installation est affiché (carte de deux ou trois lignes + espacement). */
+const INSTALL_CHROME = '96px'
 const SAFE_Y = 'env(safe-area-inset-top) - env(safe-area-inset-bottom)'
 
 export function Setup() {
@@ -35,6 +39,7 @@ export function Setup() {
   const buyIn = useGame((s) => s.game.defaultBuyInCents)
   const cfg = useGame((s) => s.game.chipConfig)
   const unit = useGame((s) => s.unit)
+  const install = useInstall()
 
   const [sheet, setSheet] = useState<Sheet>(null)
   // Gardé après la fermeture pour que la sheet ne change pas de titre pendant son animation de sortie.
@@ -127,7 +132,7 @@ export function Setup() {
       style={{
         maxWidth: landscape
           ? `min(100%, calc((100dvh - 64px - ${SAFE_Y}) * 460 / 358))`
-          : `min(100%, max(240px, calc((100dvh - ${PORTRAIT_CHROME} - ${SAFE_Y}) * 358 / 460)))`,
+          : `min(100%, max(240px, calc((100dvh - ${PORTRAIT_CHROME}${install ? ` - ${INSTALL_CHROME}` : ''} - ${SAFE_Y}) * 358 / 460)))`,
       }}
     >
       <Table seats={fromBottom(slots)} orientation={orientation} center={center} onSwap={(a, b) => gameStore.getState().reorderSeats([b, a])} />
@@ -159,6 +164,7 @@ export function Setup() {
         <>
           <div class="flex flex-col gap-3.5">
             <Header>{cfg && <UnitToggle />}</Header>
+            {install && <InstallBanner mode={install} />}
             {buyInCard}
             {actions}
           </div>
@@ -170,6 +176,7 @@ export function Setup() {
       ) : (
         <>
           <Header>{cfg && <UnitToggle />}</Header>
+          {install && <InstallBanner mode={install} />}
           {buyInCard}
           {table}
           {startHere}
