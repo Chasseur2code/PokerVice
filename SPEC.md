@@ -91,7 +91,7 @@ L'écran doit guider sans texte superflu. **Aucune stat n'est affichée** (elles
 De haut en bas :
 1. **En-tête** : logo « PokerVice ».
 2. **Carte buy-in** : « Buy-in par joueur : 10 € » (10 € par défaut, puis le dernier buy-in utilisé), avec un bouton « Modifier ».
-3. **La table** : sièges vides « + » en pointillés. Le siège du bas (le plus proche du pouce) est **mis en avant** avec la couleur d'accent et la mention « Commencez ici », qui disparaît dès le premier joueur ajouté. Au centre : « Installez vos joueurs » et « Touchez un siège + pour ajouter quelqu'un. 2 joueurs minimum. »
+3. **La table** : sièges vides « + » en pointillés. Le siège du bas (le plus proche du pouce) est **mis en avant** avec la couleur d'accent et la mention « Commencez ici », qui disparaît dès le premier joueur ajouté. Au centre : « Installez vos joueurs » et « Touchez un siège + pour ajouter quelqu'un. »
 4. **Lien discret** « Besoin d'aide pour les jetons ? » (voir §3, §5, §6).
 5. **Bouton « Démarrer la partie »**, grisé tant qu'il y a moins de 2 joueurs, puis en couleur d'accent.
 

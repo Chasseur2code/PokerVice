@@ -79,7 +79,7 @@ export function Setup() {
     seated.length === 0 ? (
       <>
         <p class="font-display text-felt-title font-semibold">Installez vos joueurs</p>
-        <p class="text-body text-white/86">Touchez un siège + pour ajouter quelqu'un. 2 joueurs minimum.</p>
+        <p class="text-body text-white/86">Touchez un siège + pour ajouter quelqu'un.</p>
       </>
     ) : seated.length < MIN_PLAYERS_TO_START ? (
       <p class="font-display text-felt-title font-semibold">

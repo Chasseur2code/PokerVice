@@ -143,7 +143,7 @@ De haut en bas, dans une colonne flex :
 3. **Table** (voir §3) :
    - **6 sièges vides** au départ ;
    - le **siège du bas** (θ = 180°) est le siège mis en avant ;
-   - au centre, sur le feutre : « Installez vos joueurs » (Fraunces 22) puis « Touchez un siège + pour ajouter quelqu'un. 2 joueurs minimum. » (Inter 14, blanc à 86 %).
+   - au centre, sur le feutre : « Installez vos joueurs » (Fraunces 22) puis « Touchez un siège + pour ajouter quelqu'un. » (Inter 14, blanc à 86 %).
 4. **« Commencez ici »** : 14 px / 600, en `--accent-text`, centré sous la table. Il disparaît après le premier joueur.
 5. **En bas** (poussé par `margin-top: auto`) :
    - le lien souligné « Besoin d'aide pour les jetons ? » (14 px, `--text-muted`) ;
