@@ -33,3 +33,32 @@ export function nextChipColor(used: readonly string[]): ChipPaletteEntry {
   const taken = new Set(used.map((h) => h.toUpperCase()))
   return CHIP_PALETTE.find((c) => !taken.has(c.hex)) ?? CHIP_PALETTE[0]!
 }
+
+/** Mallette précomposée : couleurs de la palette, quantité et valeur imprimée (absente = « auto »). */
+export interface ChipKit {
+  name: string
+  colors: readonly { color: string; qty: number; value?: number }[]
+}
+
+/** Mallettes proposées en un tap dans l'assistant (au plus 7 couleurs chacune). */
+export const CHIP_KITS: readonly ChipKit[] = [
+  {
+    name: 'Mallette de Félix',
+    colors: [
+      { color: 'Gris', qty: 94 },
+      { color: 'Rouge', qty: 40, value: 5 },
+      { color: 'Bleu', qty: 46, value: 10 },
+      { color: 'Vert', qty: 24, value: 25 },
+      { color: 'Noir', qty: 22, value: 100 },
+      { color: 'Jaune', qty: 23, value: 1000 },
+      { color: 'Violet', qty: 23, value: 500 },
+    ],
+  },
+]
+
+/** Entrée de palette d'une couleur de mallette (par son nom). */
+export function paletteEntry(name: string): ChipPaletteEntry {
+  const entry = CHIP_PALETTE.find((c) => c.name === name)
+  if (!entry) throw new Error(`Couleur hors palette : ${name}`)
+  return entry
+}

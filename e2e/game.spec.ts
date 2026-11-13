@@ -122,3 +122,19 @@ test('avec une config jetons, les stacks finaux se saisissent en points par déf
   await page.getByRole('button', { name: 'Valider' }).click()
   await expect(page.locator('main')).toContainText(/Bruno\s*→\s*Alice\s*5(,00)?\s€/)
 })
+
+test('« Mallette de Félix » remplit les couleurs, et l’assistant laisse les grosses valeurs en réserve', async ({ page }) => {
+  await page.getByRole('button', { name: "Besoin d'aide pour les jetons ?" }).click()
+  await sheet(page).getByRole('button', { name: /aide-moi à répartir/ }).click()
+  const assistant = sheet(page)
+  await assistant.getByRole('button', { name: 'Mallette de Félix' }).click()
+  await expect(assistant.getByLabel('Quantité de jetons Gris')).toHaveValue('94')
+  await expect(assistant.getByLabel(/^Valeur imposée d'un jeton Gris/)).toHaveValue('')
+  await expect(assistant.getByLabel(/^Valeur imposée d'un jeton Jaune/)).toHaveValue('1000')
+  await expect(assistant.getByLabel('Quantité de jetons Violet')).toHaveValue('23')
+
+  // 6 joueurs (défaut sans joueurs installés), sans recave : une répartition existe.
+  await assistant.getByRole('button', { name: 'Recaves prévues par joueur : moins' }).click()
+  await assistant.getByRole('button', { name: 'Proposer une répartition' }).click()
+  await expect(assistant.getByRole('button', { name: 'Valider la répartition' })).toBeEnabled()
+})

@@ -4,7 +4,7 @@
 // recalculés en direct (summarizeChips), ou le message d'échec avec ce qu'on peut assouplir.
 import { X } from 'lucide-preact'
 import { useEffect, useId, useState } from 'preact/hooks'
-import { CHIP_PALETTE, DEFAULT_CHIP_COLORS, nextChipColor } from '../../lib/chipColors'
+import { CHIP_KITS, CHIP_PALETTE, DEFAULT_CHIP_COLORS, nextChipColor, paletteEntry, type ChipKit } from '../../lib/chipColors'
 import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, duplicateFixedValues, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
 import { summarizePlayers } from '../../lib/derive'
 import { centsToInput, formatCents, parseEuros } from '../../lib/money'
@@ -110,6 +110,12 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
 
   const updateStock = (id: string, patch: Partial<StockRow>) => setStock((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
+  // Mallette précomposée : remplace toutes les lignes (quantités et valeurs imprimées).
+  const loadKit = (kit: ChipKit) => {
+    setStock(kit.colors.map((c) => ({ ...stockRow(paletteEntry(c.color), String(c.qty)), value: c.value === undefined ? '' : String(c.value) })))
+    setPickerFor(null)
+  }
+
   const pickColor = (row: StockRow, hex: string) => {
     const entry = CHIP_PALETTE.find((c) => c.hex === hex)!
     const oldName = CHIP_PALETTE.find((c) => c.hex === row.hex)?.name
@@ -196,6 +202,18 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
               <legend class="mb-1 font-semibold">
                 Couleurs de la mallette <span class="font-normal text-text-muted">({MIN_STOCK} à {MAX_STOCK})</span>
               </legend>
+              <div class="flex flex-wrap gap-2">
+                {CHIP_KITS.map((kit) => (
+                  <button
+                    key={kit.name}
+                    type="button"
+                    onClick={() => loadKit(kit)}
+                    class="h-11 rounded-full border border-border-strong bg-bg px-4 font-semibold active:bg-surface-muted"
+                  >
+                    {kit.name}
+                  </button>
+                ))}
+              </div>
               <div class="flex gap-2 text-[12px] text-text-muted" aria-hidden="true">
                 <span class="flex-1 pl-[52px]">Nom</span>
                 <span class="w-20 text-right">Quantité</span>
@@ -284,7 +302,8 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
               {!stockValid && <p class="text-[13px] text-text-muted">Indiquez un nom et une quantité pour chaque couleur.</p>}
               {valuesValid ? (
                 <p class="text-[13px] text-text-muted">
-                  Valeur en points imprimée sur vos jetons, s'il y en a une. En « auto », PokerVice choisit la meilleure.
+                  Valeur en points imprimée sur vos jetons, s'il y en a une. En « auto », PokerVice choisit la meilleure. Une
+                  couleur qui n'entre pas dans le stack reste en réserve.
                 </p>
               ) : (
                 <p class="text-[13px] text-loss">

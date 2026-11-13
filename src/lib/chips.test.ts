@@ -327,18 +327,30 @@ describe('valeurs imposées', () => {
     expect(summary.issues).toEqual([])
   })
 
-  it('stock insuffisant pour une couleur imposée : elle est nommée', () => {
-    const r = proposeChips(withFixed([150, 150, 100, 50, 10], [undefined, undefined, undefined, undefined, 500]))
-    expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.failure.blocker).toEqual({ kind: 'stock', colorName: 'Noir', needed: 12, available: 10 })
+  it('une couleur imposée trop rare (moins d’un jeton par stack) reste en réserve', () => {
+    const { colors, summary } = proposal(withFixed([150, 150, 100, 50, 10], [undefined, undefined, undefined, undefined, 500]))
+    expect(colors.find((c) => c.id === 'c4')!.perPlayer).toBe(0)
+    expect(summary.issues).toEqual([])
+  })
+
+  it('une valeur imposée trop grosse pour le stack reste en réserve (mallette de Félix)', () => {
+    // Gris auto, rouge 5, bleu 10, vert 25, noir 100, jaune 1 000, violet 500 ; 6 joueurs sans recave, 100 BB.
+    const printed = [undefined, 5, 10, 25, 100, 1000, 500]
+    const { colors, summary } = proposal(withFixed([94, 40, 46, 24, 22, 23, 23], printed, { maxPlayers: 6, rebuysPerPlayer: 0 }))
+    const used = colors.filter((c) => c.perPlayer > 0)
+    expect(used.some((c) => c.valuePoints === 1000)).toBe(false)
+    for (const c of used) if (c.id !== 'c0') expect(c.valuePoints).toBe(printed[Number(c.id.slice(1))])
+    expect(summary.issues).toEqual([])
+    expect(summary.stackPoints).toBe(100 * summary.bbPoints)
   })
 
   it('valeurs imposées incompatibles : le message propose de les libérer', () => {
-    const r = proposeChips(withFixed([150, 150, 100, 100], [1, 1000]))
+    // Seules les couleurs imposées peuvent servir : 1-2-4 ne remplit pas 100 BB, 1 000 dépasse le stack.
+    const r = proposeChips(withFixed([150, 150, 100, 100], [1, 2, 4, 1000]))
     expect(r.ok).toBe(false)
     if (r.ok) return
-    expect(r.failure.blocker).toEqual({ kind: 'fixedValues', values: [1, 1000] })
-    expect(r.failure.message).toMatch(/valeurs imposées \(1, 1\s000 pts\)/)
+    expect(r.failure.blocker).toEqual({ kind: 'fixedValues', values: [1, 2, 4, 1000] })
+    expect(r.failure.message).toMatch(/valeurs imposées \(1, 2, 4, 1\s000 pts\)/)
     expect(r.failure.message).toContain('remettre une valeur en « auto »')
   })
 

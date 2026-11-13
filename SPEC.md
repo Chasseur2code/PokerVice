@@ -139,7 +139,8 @@ Option (interrupteur) pour empêcher la mise en veille du téléphone pendant la
 | Nombre max de joueurs | nb joueurs actuels | 2 à 10 |
 | Recaves attendues par joueur | 1 | sert à garder une réserve |
 | Profondeur de départ | 100 BB | réglable de 50 à 200 |
-| Couleurs | — | entre 4 et 7 couleurs. Pour chacune : une **couleur** (palette : blanc, rouge, vert, bleu, noir, violet, jaune, rose, orange, gris… avec un nom renommable) et une **quantité** de jetons |
+| Couleurs | — | entre 4 et 7 couleurs. Pour chacune : une **couleur** (palette : blanc, rouge, vert, bleu, noir, violet, jaune, rose, orange, gris… avec un nom renommable), une **quantité** de jetons et une **valeur** facultative (valeur imprimée ; « auto » = choisie par PokerVice). Une valeur imposée veut dire « si cette couleur sert, c'est à cette valeur » : une couleur imposée qui n'entre pas dans le stack reste en réserve. |
+| Mallettes précomposées | — | boutons qui remplissent les couleurs d'un coup (« Mallette de Félix ») ; liste dans `lib/chipColors.ts` |
 
 ### 5.2 Règles
 - **Ratio SB:BB = 1:2.**

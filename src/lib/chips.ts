@@ -279,13 +279,40 @@ function search(input: ChipAssistantInput, firstOnly: boolean): Solution | null 
   return best
 }
 
-/** Variante avec valeurs imposées : toutes les couleurs imposées + les j libres les plus nombreuses. */
+/**
+ * Variante avec valeurs imposées. Une valeur imposée veut dire « si cette couleur sert, c'est à cette
+ * valeur » : on essaie chaque sous-ensemble des couleurs imposées (au plus 2^7), complété par les j
+ * couleurs libres les plus nombreuses ; les couleurs imposées écartées restent en réserve (un jeton à
+ * 1 000 n'entre pas dans un stack de 1 000 pts). La pénalité habituelle départage.
+ */
 function searchFixed(input: ChipAssistantInput, sorted: ChipStock[], firstOnly: boolean): Solution | null {
   const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
   const cap = (s: ChipStock) => divFloor(s.qty, stacks)
-  const fixed = sorted.filter((s) => s.fixedValue !== undefined).sort((a, b) => a.fixedValue! - b.fixedValue!)
+  // Une couleur dont il n'y a pas un jeton par stack ne peut pas servir.
+  const allFixed = sorted.filter((s) => s.fixedValue !== undefined && cap(s) >= 1).sort((a, b) => a.fixedValue! - b.fixedValue!)
   const free = sorted.filter((s) => s.fixedValue === undefined)
-  if (fixed.some((s) => cap(s) < 1)) return null
+  let best: Solution | null = null
+  const consider = (sol: Solution | null): boolean => {
+    if (sol && (!best || sol.penalty < best.penalty - 1e-9)) best = sol
+    return firstOnly && best !== null
+  }
+  // Aucune couleur imposée utilisée : recherche ordinaire sur les couleurs libres.
+  if (consider(search({ ...input, stock: free }, firstOnly))) return best
+  for (let mask = 1; mask < 1 << allFixed.length; mask++) {
+    const fixed = allFixed.filter((_, i) => mask & (1 << i))
+    if (consider(searchWithFixed(input, fixed, free, cap, firstOnly))) return best
+  }
+  return best
+}
+
+/** Meilleure répartition qui utilise toutes les couleurs `fixed` (à leur valeur) et des couleurs libres. */
+function searchWithFixed(
+  input: ChipAssistantInput,
+  fixed: ChipStock[],
+  free: ChipStock[],
+  cap: (s: ChipStock) => number,
+  firstOnly: boolean,
+): Solution | null {
   const F = fixed.map((s) => s.fixedValue!)
   let best: Solution | null = null
   for (let j = 0; j <= free.length; j++) {
@@ -360,13 +387,9 @@ export function proposeChips(input: ChipAssistantInput): ChipProposalResult {
 function diagnose(input: ChipAssistantInput): ChipFailure {
   const sorted = sortedStock(input.stock)
   const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
-  const fixedShort = sorted.find((s) => s.fixedValue !== undefined && s.qty < stacks)
   let blocker: ChipBlocker
   if (sorted.length < MIN_COLORS_USED) {
     blocker = { kind: 'tooFewColors' }
-  } else if (fixedShort) {
-    // Une couleur à valeur imposée doit entrer dans chaque stack.
-    blocker = { kind: 'stock', colorName: fixedShort.name, needed: stacks, available: fixedShort.qty }
   } else if (sorted[MIN_COLORS_USED - 1]!.qty < stacks) {
     const s = sorted[MIN_COLORS_USED - 1]!
     blocker = { kind: 'stock', colorName: s.name, needed: stacks, available: s.qty }
