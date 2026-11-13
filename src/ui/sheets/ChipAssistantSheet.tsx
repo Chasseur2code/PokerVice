@@ -5,7 +5,7 @@
 import { X } from 'lucide-preact'
 import { useEffect, useId, useState } from 'preact/hooks'
 import { CHIP_KITS, CHIP_PALETTE, DEFAULT_CHIP_COLORS, nextChipColor, paletteEntry, type ChipKit } from '../../lib/chipColors'
-import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, duplicateFixedValues, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
+import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, MAX_REBUYS_SHOWN, SMALL_CHIPS_ADVISED, duplicateFixedValues, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
 import { summarizePlayers } from '../../lib/derive'
 import { centsToInput, formatCents, parseEuros } from '../../lib/money'
 import { MAX_SEATED, MIN_PLAYERS_TO_START } from '../../lib/players'
@@ -422,10 +422,19 @@ function Proposal({ rows, setRows, colors, summary, buyInCents, running, onBack 
           ))}
         </ul>
       ) : (
-        <p class="num text-body text-text-muted">
-          La réserve permet {plural(summary.rebuysPossible, 'recave')} pour toute la table.
-          {running && ' Une fois validée, la répartition ne pourra plus être modifiée.'}
-        </p>
+        <div class="flex flex-col gap-1">
+          {summary.smallChipsPerPlayer < SMALL_CHIPS_ADVISED && (
+            <p class="num text-body text-accent-text">
+              Seulement {summary.smallChipsPerPlayer} petits jetons par joueur ({SMALL_CHIPS_ADVISED} conseillés) : la mallette n'en a pas
+              assez pour mieux faire.
+            </p>
+          )}
+          <p class="num text-body text-text-muted">
+            La réserve permet {summary.rebuysPossible >= MAX_REBUYS_SHOWN ? `${MAX_REBUYS_SHOWN} recaves ou plus` : plural(summary.rebuysPossible, 'recave')}{' '}
+            pour toute la table (gros jetons d'abord : on fait la monnaie à la table).
+            {running && ' Une fois validée, la répartition ne pourra plus être modifiée.'}
+          </p>
+        </div>
       )}
 
       <SecondaryButton onClick={onBack}>Modifier les paramètres</SecondaryButton>

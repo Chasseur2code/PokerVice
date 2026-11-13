@@ -3,7 +3,9 @@ import {
   MAX_PER_COLOR,
   duplicateFixedValues,
   MIN_SMALL_CHIPS,
+  SMALL_CHIPS_ADVISED,
   TARGET_SMALL_CHIPS,
+  rebuysFromReserve,
   proposeChips,
   summarizeChips,
   toChipConfig,
@@ -36,7 +38,6 @@ function expectValid(inp: ChipAssistantInput) {
   const { colors, summary } = proposal(inp)
   const used = colors.filter((c) => c.perPlayer > 0)
   const values = used.map((c) => c.valuePoints)
-  const stacks = inp.maxPlayers * (1 + inp.rebuysPerPlayer)
 
   expect(summary.issues).toEqual([])
   expect(used.length).toBeGreaterThanOrEqual(3)
@@ -58,12 +59,14 @@ function expectValid(inp: ChipAssistantInput) {
   }
   // Les plus nombreuses ont les plus petites valeurs.
   for (let i = 1; i < used.length; i++) expect(used[i]!.totalQty).toBeLessThanOrEqual(used[i - 1]!.totalQty)
-  // Stock : nb par joueur × joueurs × (1 + recaves) ≤ quantité.
+  // Stock : nb par joueur × joueurs ≤ quantité (stacks de départ) ; la réserve couvre les recaves prévues.
   for (const c of used) {
-    expect(c.perPlayer * stacks).toBeLessThanOrEqual(c.totalQty)
+    expect(c.perPlayer * inp.maxPlayers).toBeLessThanOrEqual(c.totalQty)
     expect(c.perPlayer).toBeLessThanOrEqual(MAX_PER_COLOR)
   }
-  expect(used[0]!.perPlayer).toBeGreaterThanOrEqual(MIN_SMALL_CHIPS)
+  // Mallettes réalistes : la contrainte souple des petits jetons est respectée.
+  expect(used[0]!.perPlayer).toBeGreaterThanOrEqual(SMALL_CHIPS_ADVISED)
+  expect(summary.smallChipsPerPlayer).toBe(used[0]!.perPlayer)
   expect(summary.rebuysPossible).toBeGreaterThanOrEqual(inp.maxPlayers * inp.rebuysPerPlayer)
   return { colors, used, summary }
 }
@@ -118,24 +121,47 @@ describe('proposeChips — cas réalistes à 100 BB (critère 6)', () => {
 })
 
 describe('proposeChips — cas impossibles', () => {
-  it('trop peu de petits jetons : explique et propose des assouplissements qui marchent', () => {
-    const inp = input([150, 150, 100, 50, 50], { maxPlayers: 10 })
+  it('trop peu de petits jetons, même sous le plancher dur de 5 : explique et propose ce qui marche', () => {
+    const inp = input([40, 40, 40, 40], { maxPlayers: 10 })
     const r = proposeChips(inp)
     expect(r.ok).toBe(false)
     if (r.ok) return
-    expect(r.failure.blocker).toEqual({ kind: 'smallChips', colorName: 'Blanc', needed: 160, available: 150 })
-    expect(r.failure.suggestions).toEqual({ maxPlayers: 9, rebuysPerPlayer: 0 })
+    expect(r.failure.blocker).toEqual({ kind: 'smallChips', colorName: 'Blanc', needed: 50, available: 40 })
+    expect(r.failure.suggestions).toEqual({ maxPlayers: 8 })
     expect(r.failure.message).toBe(
-      'Pas assez de petits jetons Blanc : pour en donner 8 à chacun, il en faut 160 (10 joueurs × 2 stacks), il y en a 150. ' +
-        'Pour y arriver : prévoir 9 joueurs au plus, ou prévoir 0 recave par joueur.',
+      'Pas assez de petits jetons Blanc : pour en donner au moins 5 à chacun, il en faut 50 (10 joueurs), il y en a 40. ' +
+        'Pour y arriver : prévoir 8 joueurs au plus.',
     )
-    // Chaque suggestion, appliquée seule, donne bien une répartition.
-    expectValid({ ...inp, maxPlayers: 9 })
+    // La suggestion donne une répartition, avec moins de petits jetons que conseillé (contrainte souple).
+    const ok = proposal({ ...inp, maxPlayers: 8 })
+    expect(ok.summary.issues).toEqual([])
+    expect(ok.summary.smallChipsPerPlayer).toBe(5)
+  })
+
+  it('contrainte souple : sous 8 petits jetons seulement si la mallette ne permet pas mieux', () => {
+    // Couleur la plus nombreuse = petits jetons. 94 pour 10 joueurs : 8 ou 9 chacun ; 70 : 7 au plus (avertissement, pas d'erreur).
+    const { summary } = proposal(input([94, 90, 90, 90], { maxPlayers: 10, rebuysPerPlayer: 0 }))
+    expect(summary.smallChipsPerPlayer).toBeGreaterThanOrEqual(SMALL_CHIPS_ADVISED)
+    const scarce = proposal(input([70, 60, 60, 60], { maxPlayers: 10, rebuysPerPlayer: 0 }))
+    // Proposée quand même (plus d'échec), entre le plancher dur et le conseillé ; le résultat l'affiche.
+    expect(scarce.summary.smallChipsPerPlayer).toBeGreaterThanOrEqual(MIN_SMALL_CHIPS)
+    expect(scarce.summary.smallChipsPerPlayer).toBeLessThan(SMALL_CHIPS_ADVISED)
+    expect(scarce.summary.issues).toEqual([])
+  })
+
+  it('recaves à part : la réserve doit les couvrir, sinon le blocage le dit', () => {
+    const inp = input([100, 100, 100], { depthBB: 200 })
+    const r = proposeChips(inp)
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.failure.blocker).toEqual({ kind: 'rebuyReserve', rebuys: 6 })
+    expect(r.failure.message).toContain('il ne resterait pas assez de jetons pour 6 recaves')
+    expect(r.failure.suggestions.rebuysPerPlayer).toBe(0)
     expectValid({ ...inp, rebuysPerPlayer: 0 })
   })
 
   it('stack trop profond pour le stock : propose moins de BB', () => {
-    const inp = input([100, 100, 100], { depthBB: 200 })
+    const inp = input([40, 20, 20], { maxPlayers: 4, rebuysPerPlayer: 0, depthBB: 200 })
     const r = proposeChips(inp)
     expect(r.ok).toBe(false)
     if (r.ok) return
@@ -146,11 +172,11 @@ describe('proposeChips — cas impossibles', () => {
     expect(r.failure.message).toContain(`descendre à ${d} BB`)
   })
 
-  it('une couleur sans assez de jetons pour un par stack', () => {
-    const r = proposeChips(input([200, 200, 5, 5], { maxPlayers: 4 }))
+  it('une couleur sans assez de jetons pour un par joueur', () => {
+    const r = proposeChips(input([200, 200, 3, 3], { maxPlayers: 4 }))
     expect(r.ok).toBe(false)
     if (r.ok) return
-    expect(r.failure.blocker).toEqual({ kind: 'stock', colorName: 'Vert', needed: 8, available: 5 })
+    expect(r.failure.blocker).toEqual({ kind: 'stock', colorName: 'Vert', needed: 4, available: 3 })
   })
 
   it('moins de 3 couleurs', () => {
@@ -165,17 +191,22 @@ describe('proposeChips — cas impossibles', () => {
     const r = proposeChips(input([100, 100, 5], { maxPlayers: 10, rebuysPerPlayer: 0 }))
     expect(r.ok).toBe(false)
     if (r.ok) return
-    expect(r.failure.message).toContain('(10 joueurs × 1 stack)')
+    expect(r.failure.message).toContain('(un par joueur, 10 joueurs)')
     expect(r.failure.suggestions.depthBB).toBeUndefined()
     const big = proposeChips(input([1500, 1000, 1000], { maxPlayers: 10, rebuysPerPlayer: 19 }))
     if (big.ok) throw new Error('attendu impossible')
-    expect(big.failure.message).toContain(`il en faut ${new Intl.NumberFormat('fr-FR').format(1600)}`)
+    expect(big.failure.message).toContain('pas assez de jetons pour 190 recaves')
   })
 
-  it("l'échec reste rapide (10 joueurs, 3 recaves, 200 BB, une couleur en manque)", () => {
-    const t = performance.now()
-    const r = proposeChips(input([400, 400, 400, 39, 39], { maxPlayers: 10, rebuysPerPlayer: 3, depthBB: 200 }))
-    expect(r.ok).toBe(false)
+  it('reste rapide (10 joueurs, 3 recaves, 200 BB ; 7 couleurs dont 6 imposées)', () => {
+    let t = performance.now()
+    proposeChips(input([400, 400, 400, 39, 39], { maxPlayers: 10, rebuysPerPlayer: 3, depthBB: 200 }))
+    expect(performance.now() - t).toBeLessThan(500)
+    // Échec avec diagnostic complet : 2^6 sous-ensembles de couleurs imposées à chaque essai.
+    t = performance.now()
+    const qty = [94, 40, 46, 24, 22, 23, 23]
+    const printed = [undefined, 5, 10, 25, 100, 1000, 500]
+    proposeChips(input(qty, { maxPlayers: 10, rebuysPerPlayer: 2, stock: stock(...qty).map((s, i) => ({ ...s, fixedValue: printed[i] })) }))
     expect(performance.now() - t).toBeLessThan(500)
   })
 
@@ -204,13 +235,15 @@ describe('summarizeChips — édition manuelle', () => {
     expect(s).toMatchObject({ sbPoints: 5, bbPoints: 10, stackPoints: 1000, stackBBTenths: 1000, chipsPerPlayer: 32 })
     expect(s.centsPerPoint).toEqual({ num: 2, den: 1 })
     expect(s.colors).toEqual([
-      { id: 'w', reserve: 90, rebuys: 9 },
-      { id: 'r', reserve: 78, rebuys: 6 },
-      { id: 'g', reserve: 58, rebuys: 8 },
-      { id: 'b', reserve: 32, rebuys: 10 },
-      { id: 'k', reserve: 50, rebuys: null },
+      { id: 'w', reserve: 90 },
+      { id: 'r', reserve: 78 },
+      { id: 'g', reserve: 58 },
+      { id: 'b', reserve: 32 },
+      { id: 'k', reserve: 50 },
     ])
-    expect(s.rebuysPossible).toBe(6)
+    // Recaves de 1 000 pts, gros jetons d'abord : 3 en bleu, puis bleu + vert, vert, ... (8 en tout).
+    expect(s.rebuysPossible).toBe(8)
+    expect(s.smallChipsPerPlayer).toBe(10)
     expect(s.issues).toEqual([])
   })
 
@@ -297,24 +330,41 @@ describe('summarizeChips — édition manuelle', () => {
   })
 })
 
+describe('rebuysFromReserve', () => {
+  it('compose les recaves avec les gros jetons d’abord', () => {
+    // Mallette de Félix après 6 stacks (1×15, 5×5, 10×6, 100×1) : 2 noirs par recave de 200.
+    expect(rebuysFromReserve([1, 5, 10, 100], [4, 10, 10, 16], 200, 99)).toBe(8)
+    expect(rebuysFromReserve([1, 5, 10, 100], [4, 10, 10, 16], 200, 3)).toBe(3)
+  })
+
+  it('reste prudent : peut sous-estimer avec des valeurs non multiples, jamais surestimer', () => {
+    // 30 = 3 × 10, mais le glouton prend 25 et bloque sur 5.
+    expect(rebuysFromReserve([10, 25], [3, 10], 30, 99)).toBe(0)
+    expect(rebuysFromReserve([10, 25], [0, 0], 30, 99)).toBe(0)
+  })
+})
+
 describe('valeurs imposées', () => {
   /** Mallette de 500 jetons ; `fixed[i]` impose la valeur de la couleur i. */
   const withFixed = (qty: number[], fixed: (number | undefined)[], patch: Partial<ChipAssistantInput> = {}) =>
     input(qty, { stock: stock(...qty).map((s, i) => (fixed[i] === undefined ? s : { ...s, fixedValue: fixed[i] })), ...patch })
 
-  it('chaque couleur imposée est utilisée à sa valeur, les autres restent libres', () => {
-    const inp = withFixed([150, 150, 100, 50, 50], [5, 25, 100])
+  it('une couleur imposée utilisée l’est à sa valeur ; aucune couleur libre ne prend une valeur imposée', () => {
+    const imposed = [5, 25, 100]
+    const inp = withFixed([150, 150, 100, 50, 50], imposed)
     const { colors, summary } = proposal(inp)
-    const byId = new Map(colors.map((c) => [c.id, c]))
-    expect([byId.get('c0')!.valuePoints, byId.get('c1')!.valuePoints, byId.get('c2')!.valuePoints]).toEqual([5, 25, 100])
-    for (const id of ['c0', 'c1', 'c2']) expect(byId.get(id)!.perPlayer).toBeGreaterThan(0)
+    for (const c of colors.filter((x) => x.perPlayer > 0)) {
+      const i = Number(c.id.slice(1))
+      if (i < imposed.length) expect(c.valuePoints).toBe(imposed[i])
+      else expect(imposed).not.toContain(c.valuePoints)
+    }
     expect(summary.issues).toEqual([])
     expect(summary.sbPoints).toBe(5)
     expect(summary.stackPoints).toBe(100 * summary.bbPoints)
   })
 
   it('accepte des valeurs imprimées non multiples (10 puis 25)', () => {
-    const { colors, summary } = proposal(withFixed([200, 200, 100, 100], [10, 25]))
+    const { colors, summary } = proposal(withFixed([200, 200, 100], [10, 25, 100], { rebuysPerPlayer: 0 }))
     const values = colors.filter((c) => c.perPlayer > 0).map((c) => c.valuePoints)
     expect(values.indexOf(25) - values.indexOf(10)).toBe(1)
     expect(summary.issues).toEqual([])

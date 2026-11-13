@@ -9,8 +9,15 @@
 //     exacte du stack qui minimise une pénalité séparable couleur par couleur.
 // Tout est calculé en « unités » = multiples de la SB, puis converti en points.
 //
-// Valeurs imposées (`fixedValue`, ex. jetons imprimés) : la couleur est forcément utilisée, à cette
-// valeur ; les couleurs libres comblent les trous (la plus nombreuse sur la plus petite valeur libre).
+// Deux idées reprises de poker-chipper (github.com/jstrieb/poker-chipper) :
+//   - contraintes souples plutôt que dures : en dessous de 8 petits jetons par joueur, la note baisse
+//     fortement au lieu de rendre la répartition impossible (plancher dur : 5) ;
+//   - recaves à part : les plafonds ne portent que sur les stacks de départ (stock ÷ joueurs) ; la réserve
+//     des couleurs utilisées doit ensuite permettre de composer les recaves prévues, dans n'importe quelle
+//     composition (gros jetons d'abord), et non des stacks identiques au départ.
+//
+// Valeurs imposées (`fixedValue`, ex. jetons imprimés) : si la couleur sert, c'est à cette valeur
+// (sinon elle reste en réserve) ; les couleurs libres comblent les trous (la plus nombreuse sur la plus petite valeur libre).
 // Entre deux valeurs libres, la règle reste « multiple, rapport 2 à 5 » ; à côté d'une valeur imposée,
 // seulement « rapport 2 à 5 » (5-10-25 est courant), et deux valeurs imposées doivent juste croître.
 // L'unité de calcul est alors le PGCD des valeurs.
@@ -46,9 +53,11 @@ export interface ChipSummary {
   /** 1 point = buy-in ÷ stack ; `null` si le stack est vide. */
   centsPerPoint: Fraction | null
   chipsPerPlayer: number
-  /** Une ligne par couleur, dans l'ordre reçu. `rebuys` = stacks complets que la réserve permet encore. */
-  colors: { id: string; reserve: number; rebuys: number | null }[]
-  /** Nombre de recaves (stacks complets) que la réserve permet pour toute la table. */
+  /** Jetons de la plus petite valeur dans chaque stack (sous SMALL_CHIPS_ADVISED : avertissement, pas une erreur). */
+  smallChipsPerPlayer: number
+  /** Une ligne par couleur, dans l'ordre reçu. */
+  colors: { id: string; reserve: number }[]
+  /** Recaves (d'un stack chacune, gros jetons d'abord) que la réserve permet pour toute la table, au plus MAX_REBUYS_SHOWN. */
   rebuysPossible: number
   issues: ChipIssue[]
 }
@@ -67,6 +76,8 @@ export type ChipBlocker =
   | { kind: 'tooFewColors' }
   | { kind: 'stock'; colorName: string; needed: number; available: number }
   | { kind: 'smallChips'; colorName: string; needed: number; available: number }
+  /** Les stacks de départ passent, mais la réserve ne couvre pas les recaves prévues. */
+  | { kind: 'rebuyReserve'; rebuys: number }
   /** Possible sans les valeurs imposées, mais pas avec. */
   | { kind: 'fixedValues'; values: number[] }
   | { kind: 'composition' }
@@ -84,9 +95,15 @@ export type ChipProposalResult =
 
 /** Couleurs utilisées au minimum (SPEC : 4 à 7 saisies, dont certaines peuvent rester en réserve). */
 export const MIN_COLORS_USED = 3
-/** Plancher dur de jetons de SB par joueur ; en dessous de TARGET_SMALL_CHIPS, la note baisse. */
-export const MIN_SMALL_CHIPS = 8
+/**
+ * Jetons de SB par joueur : plancher dur MIN_SMALL_CHIPS ; sous SMALL_CHIPS_ADVISED, forte pénalité
+ * (et avertissement dans le résultat) ; sous TARGET_SMALL_CHIPS, pénalité légère.
+ */
+export const MIN_SMALL_CHIPS = 5
+export const SMALL_CHIPS_ADVISED = 8
 export const TARGET_SMALL_CHIPS = 10
+/** Au-delà, « La réserve permet N recaves » n'a plus d'intérêt (et le calcul s'arrête). */
+export const MAX_REBUYS_SHOWN = 99
 export const DEPTH_MIN = 50
 export const DEPTH_MAX = 200
 /** Plafond d'une valeur imposée (points) : garde les calculs entiers exacts. */
@@ -102,6 +119,7 @@ const SB_CANDIDATES = [1, 2, 5, 10, 25, 50, 100]
 // Poids de la pénalité (plus bas = mieux). Valeurs réglées sur des mallettes de 300 et 500 jetons.
 const W_CHIP = 1 // chaque jeton dans le stack (un stack énorme est peu pratique)
 const W_SMALL_MISSING = 12 // par petit jeton manquant sous TARGET_SMALL_CHIPS
+const W_SMALL_SCARCE = 30 // en plus, par petit jeton manquant sous SMALL_CHIPS_ADVISED (contrainte souple)
 const W_SMALL_BONUS = 0.6 // par petit jeton jusqu'à SMALL_BONUS_CAP (liquidité)
 const SMALL_BONUS_CAP = 20
 const W_CHANGE = 4 // par « monnaie » manquante (on vise 2 jetons changés avec la couleur juste en dessous)
@@ -153,7 +171,7 @@ type FixedSequence = { values: number[]; fixed: boolean[] }
  * (triées, distinctes) ; les valeurs libres sont prises dans la série ronde. Aucune valeur ne dépasse
  * le stack (profondeur × BB, la BB valant deux fois la première valeur).
  */
-function fixedSequences(F: readonly number[], free: number, depthBB: number): FixedSequence[] {
+function fixedSequences(F: readonly number[], free: number, depthBB: number, forbidden: ReadonlySet<number>): FixedSequence[] {
   const out: FixedSequence[] = []
   const k = F.length + free
   const walk = (values: number[], fixed: boolean[], fi: number) => {
@@ -170,14 +188,14 @@ function fixedSequences(F: readonly number[], free: number, depthBB: number): Fi
     if (values.length - fi >= free) return
     for (const v of SERIES) {
       if (v > 5 * last || v > maxValue || (nextF !== undefined && v >= nextF)) break
-      if (ratioOk(v) && (lastFixed || v % last === 0)) walk([...values, v], [...fixed, false], fi)
+      if (ratioOk(v) && (lastFixed || v % last === 0) && !forbidden.has(v)) walk([...values, v], [...fixed, false], fi)
     }
   }
   if (F.length === 0) return out
   walk([F[0]!], [true], 1)
   if (free > 0) for (const v of SERIES) {
     if (v >= F[0]!) break
-    walk([v], [false], 0)
+    if (!forbidden.has(v)) walk([v], [false], 0)
   }
   return out
 }
@@ -215,7 +233,10 @@ function bestComposition(units: number[], caps: number[], target: number): { pen
     const cost = new Float64Array(maxC + 1)
     for (let c = minC; c <= maxC; c++) {
       let p = W_CHIP * c + (W_BIG * c * w * logs[i]!) / target
-      if (i === 0) p += W_SMALL_MISSING * Math.max(0, TARGET_SMALL_CHIPS - c) - W_SMALL_BONUS * Math.min(c, SMALL_BONUS_CAP)
+      if (i === 0) {
+        p += W_SMALL_MISSING * Math.max(0, TARGET_SMALL_CHIPS - c) - W_SMALL_BONUS * Math.min(c, SMALL_BONUS_CAP)
+        p += W_SMALL_SCARCE * Math.max(0, SMALL_CHIPS_ADVISED - c)
+      }
       if (i + 1 < k) p += W_CHANGE * Math.max(0, 2 - (c * w) / units[i + 1]!)
       cost[c] = p
     }
@@ -256,22 +277,28 @@ function sortedStock(stock: readonly ChipStock[]): ChipStock[] {
   return stock.filter((s) => s.qty > 0).sort((a, b) => b.qty - a.qty)
 }
 
-/** Recherche de la meilleure répartition ; `firstOnly` s'arrête à la première trouvée (test de faisabilité). */
-function search(input: ChipAssistantInput, firstOnly: boolean): Solution | null {
+/**
+ * Recherche de la meilleure répartition ; `firstOnly` s'arrête à la première trouvée (test de faisabilité).
+ * `forbidden` : valeurs interdites aux couleurs libres (celles imposées à d'autres couleurs, même en réserve).
+ */
+function search(input: ChipAssistantInput, firstOnly: boolean, forbidden: ReadonlySet<number> = new Set()): Solution | null {
   const sorted = sortedStock(input.stock)
   if (sorted.some((s) => s.fixedValue !== undefined)) return searchFixed(input, sorted, firstOnly)
-  const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
-  const caps = sorted.map((s) => divFloor(s.qty, stacks))
+  // Plafonds : stacks de départ seulement ; les recaves sont vérifiées à part (reserveCovers).
+  const caps = sorted.map((s) => divFloor(s.qty, input.maxPlayers))
   const target = 2 * input.depthBB // stack en unités de SB
   let best: Solution | null = null
   for (let k = MIN_COLORS_USED; k <= sorted.length; k++) {
     if (caps[k - 1]! < 1) break
     for (const { sb, units } of sequences(k, target)) {
       if (units.reduce((s, u) => s + u, 0) > target) continue
+      if (forbidden.size > 0 && units.some((u) => forbidden.has(u * sb))) continue
       const r = bestComposition(units, caps.slice(0, k), target)
       if (!r) continue
       if (!best || r.penalty < best.penalty - 1e-9) {
-        best = { penalty: r.penalty, colors: sorted.slice(0, k), values: units.map((u) => u * sb), counts: r.counts }
+        const colors = sorted.slice(0, k)
+        if (!reserveCovers(input, colors, units, r.counts)) continue
+        best = { penalty: r.penalty, colors, values: units.map((u) => u * sb), counts: r.counts }
         if (firstOnly) return best
       }
     }
@@ -286,21 +313,22 @@ function search(input: ChipAssistantInput, firstOnly: boolean): Solution | null 
  * 1 000 n'entre pas dans un stack de 1 000 pts). La pénalité habituelle départage.
  */
 function searchFixed(input: ChipAssistantInput, sorted: ChipStock[], firstOnly: boolean): Solution | null {
-  const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
-  const cap = (s: ChipStock) => divFloor(s.qty, stacks)
-  // Une couleur dont il n'y a pas un jeton par stack ne peut pas servir.
+  const cap = (s: ChipStock) => divFloor(s.qty, input.maxPlayers)
+  // Une couleur dont il n'y a pas un jeton par joueur ne peut pas servir.
   const allFixed = sorted.filter((s) => s.fixedValue !== undefined && cap(s) >= 1).sort((a, b) => a.fixedValue! - b.fixedValue!)
   const free = sorted.filter((s) => s.fixedValue === undefined)
+  // Deux couleurs de même valeur prêteraient à confusion : une couleur libre ne prend jamais une valeur imposée.
+  const forbidden = new Set(sorted.flatMap((s) => (s.fixedValue === undefined ? [] : [s.fixedValue])))
   let best: Solution | null = null
   const consider = (sol: Solution | null): boolean => {
     if (sol && (!best || sol.penalty < best.penalty - 1e-9)) best = sol
     return firstOnly && best !== null
   }
   // Aucune couleur imposée utilisée : recherche ordinaire sur les couleurs libres.
-  if (consider(search({ ...input, stock: free }, firstOnly))) return best
+  if (consider(search({ ...input, stock: free }, firstOnly, forbidden))) return best
   for (let mask = 1; mask < 1 << allFixed.length; mask++) {
     const fixed = allFixed.filter((_, i) => mask & (1 << i))
-    if (consider(searchWithFixed(input, fixed, free, cap, firstOnly))) return best
+    if (consider(searchWithFixed(input, fixed, free, cap, forbidden, firstOnly))) return best
   }
   return best
 }
@@ -311,6 +339,7 @@ function searchWithFixed(
   fixed: ChipStock[],
   free: ChipStock[],
   cap: (s: ChipStock) => number,
+  forbidden: ReadonlySet<number>,
   firstOnly: boolean,
 ): Solution | null {
   const F = fixed.map((s) => s.fixedValue!)
@@ -318,7 +347,7 @@ function searchWithFixed(
   for (let j = 0; j <= free.length; j++) {
     if (j > 0 && cap(free[j - 1]!) < 1) break
     if (fixed.length + j < MIN_COLORS_USED) continue
-    for (const { values, fixed: isFixed } of fixedSequences(F, j, input.depthBB)) {
+    for (const { values, fixed: isFixed } of fixedSequences(F, j, input.depthBB, forbidden)) {
       let fi = 0
       let gi = 0
       const colors = isFixed.map((f) => (f ? fixed[fi++]! : free[gi++]!))
@@ -329,12 +358,50 @@ function searchWithFixed(
       const r = bestComposition(units, colors.map(cap), target)
       if (!r) continue
       if (!best || r.penalty < best.penalty - 1e-9) {
+        if (!reserveCovers(input, colors, units, r.counts)) continue
         best = { penalty: r.penalty, colors, values, counts: r.counts }
         if (firstOnly) return best
       }
     }
   }
   return best
+}
+
+/**
+ * La réserve des couleurs utilisées (stock − stacks de départ) permet-elle les recaves prévues,
+ * chacune d'un stack, composée librement ? `values` en unités ou en points, du moment que c'est cohérent.
+ */
+function reserveCovers(input: ChipAssistantInput, colors: readonly ChipStock[], values: readonly number[], counts: readonly number[]): boolean {
+  const needed = input.maxPlayers * input.rebuysPerPlayer
+  if (needed === 0) return true
+  const stack = values.reduce((s, v, i) => s + v * counts[i]!, 0)
+  const reserve = colors.map((c, i) => c.qty - input.maxPlayers * counts[i]!)
+  return rebuysFromReserve(values, reserve, stack, needed) >= needed
+}
+
+/**
+ * Nombre de recaves d'un stack (`stack` points) qu'on peut composer avec la réserve, au plus `max`.
+ * Gros jetons d'abord, comme à la table : une recave de 200 pts = 2 jetons de 100. Glouton, donc prudent :
+ * il peut sous-estimer avec des valeurs non multiples (10 et 25), jamais surestimer.
+ */
+export function rebuysFromReserve(values: readonly number[], reserve: readonly number[], stack: number, max: number): number {
+  if (stack <= 0) return 0
+  const order = values.map((_, i) => i).sort((a, b) => values[b]! - values[a]!)
+  const left = reserve.map((r) => Math.max(0, r))
+  let n = 0
+  while (n < max) {
+    let amount = stack
+    for (const i of order) {
+      const v = values[i]!
+      if (v <= 0) continue
+      const take = Math.min(left[i]!, Math.floor(amount / v))
+      left[i] = left[i]! - take
+      amount -= take * v
+    }
+    if (amount !== 0) break
+    n++
+  }
+  return n
 }
 
 function validateInput(input: ChipAssistantInput): void {
@@ -386,15 +453,18 @@ export function proposeChips(input: ChipAssistantInput): ChipProposalResult {
 
 function diagnose(input: ChipAssistantInput): ChipFailure {
   const sorted = sortedStock(input.stock)
-  const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
+  // Plafonds sur les stacks de départ seulement (les recaves sont vérifiées à part).
+  const players = input.maxPlayers
   let blocker: ChipBlocker
   if (sorted.length < MIN_COLORS_USED) {
     blocker = { kind: 'tooFewColors' }
-  } else if (sorted[MIN_COLORS_USED - 1]!.qty < stacks) {
+  } else if (sorted[MIN_COLORS_USED - 1]!.qty < players) {
     const s = sorted[MIN_COLORS_USED - 1]!
-    blocker = { kind: 'stock', colorName: s.name, needed: stacks, available: s.qty }
-  } else if (sorted[0]!.qty < MIN_SMALL_CHIPS * stacks) {
-    blocker = { kind: 'smallChips', colorName: sorted[0]!.name, needed: MIN_SMALL_CHIPS * stacks, available: sorted[0]!.qty }
+    blocker = { kind: 'stock', colorName: s.name, needed: players, available: s.qty }
+  } else if (sorted[0]!.qty < MIN_SMALL_CHIPS * players) {
+    blocker = { kind: 'smallChips', colorName: sorted[0]!.name, needed: MIN_SMALL_CHIPS * players, available: sorted[0]!.qty }
+  } else if (input.rebuysPerPlayer > 0 && search({ ...input, rebuysPerPlayer: 0 }, true)) {
+    blocker = { kind: 'rebuyReserve', rebuys: input.maxPlayers * input.rebuysPerPlayer }
   } else if (
     sorted.some((s) => s.fixedValue !== undefined) &&
     search({ ...input, stock: input.stock.map(({ fixedValue: _, ...s }) => s) }, true)
@@ -408,7 +478,8 @@ function diagnose(input: ChipAssistantInput): ChipFailure {
   const suggestions: ChipFailure['suggestions'] = {}
   if (blocker.kind !== 'tooFewColors') {
     const feasible = (patch: Partial<ChipAssistantInput>) => search({ ...input, ...patch }, true) !== null
-    // Moins de stacks = plafonds plus hauts : la faisabilité est monotone en joueurs et en recaves.
+    // Moins de joueurs = plafonds plus hauts et réserve plus grande ; moins de recaves = réserve suffisante
+    // plus facilement : la faisabilité est monotone en joueurs et en recaves.
     const p = largestFeasible(2, input.maxPlayers - 1, (p) => feasible({ maxPlayers: p }))
     if (p !== null) suggestions.maxPlayers = p
     const r = largestFeasible(0, input.rebuysPerPlayer - 1, (r) => feasible({ rebuysPerPlayer: r }))
@@ -446,17 +517,20 @@ const intFormatter = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }
 const plural = (n: number, word: string) => `${intFormatter.format(n)} ${word}${n > 1 ? 's' : ''}`
 
 function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailure['suggestions']): string {
-  const stacks = `${plural(input.maxPlayers, 'joueur')} × ${plural(1 + input.rebuysPerPlayer, 'stack')}`
+  const players = plural(input.maxPlayers, 'joueur')
   const n = (x: number) => intFormatter.format(x)
   let why: string
   switch (b.kind) {
     case 'tooFewColors':
       return `Il faut au moins ${MIN_COLORS_USED} couleurs de jetons pour composer un stack.`
     case 'stock':
-      why = `Pas assez de jetons ${b.colorName} : il en faut au moins ${n(b.needed)} (${stacks}), il y en a ${n(b.available)}.`
+      why = `Pas assez de jetons ${b.colorName} : il en faut au moins ${n(b.needed)} (un par joueur, ${players}), il y en a ${n(b.available)}.`
       break
     case 'smallChips':
-      why = `Pas assez de petits jetons ${b.colorName} : pour en donner ${MIN_SMALL_CHIPS} à chacun, il en faut ${n(b.needed)} (${stacks}), il y en a ${n(b.available)}.`
+      why = `Pas assez de petits jetons ${b.colorName} : pour en donner au moins ${MIN_SMALL_CHIPS} à chacun, il en faut ${n(b.needed)} (${players}), il y en a ${n(b.available)}.`
+      break
+    case 'rebuyReserve':
+      why = `Les stacks de départ sont possibles, mais il ne resterait pas assez de jetons pour ${plural(b.rebuys, 'recave')}.`
       break
     case 'fixedValues':
       why = `Aucune répartition ne respecte les valeurs imposées (${b.values.map(n).join(', ')} pts) : entre deux jetons voisins, il faut un rapport de 2 à 5, et assez de petits jetons pour faire la monnaie.`
@@ -499,16 +573,12 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
     seen.add(c.valuePoints)
   }
 
-  let rebuysPossible = Infinity
   const rows = colors.map((c) => {
-    if (!isValidColor(c)) return { id: c.id, reserve: 0, rebuys: null }
+    if (!isValidColor(c)) return { id: c.id, reserve: 0 }
     const inPlay = used.includes(c) ? c.perPlayer * maxPlayers : 0
     const reserve = c.totalQty - inPlay
     if (reserve < 0) issues.push({ kind: 'stockExceeded', colorId: c.id, needed: inPlay, available: c.totalQty })
-    if (!used.includes(c)) return { id: c.id, reserve, rebuys: null }
-    const rebuys = Math.max(0, divFloor(reserve, c.perPlayer))
-    rebuysPossible = Math.min(rebuysPossible, rebuys)
-    return { id: c.id, reserve, rebuys }
+    return { id: c.id, reserve }
   })
 
   const sbPoints = used.length ? Math.min(...used.map((c) => c.valuePoints)) : 0
@@ -517,6 +587,10 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
   // stackPoints × 10 entier sûr ⇒ stackPoints aussi.
   const sizeOk = Number.isSafeInteger(stackPoints * 10)
   if (!sizeOk) issues.push({ kind: 'tooLarge' })
+  const smallest = used.reduce<ChipColor | undefined>((a, c) => (!a || c.valuePoints < a.valuePoints ? c : a), undefined)
+  const reserveOf = (c: ChipColor) => rows.find((r) => r.id === c.id)!.reserve
+  const rebuysPossible =
+    issues.length > 0 ? 0 : rebuysFromReserve(used.map((c) => c.valuePoints), used.map(reserveOf), stackPoints, MAX_REBUYS_SHOWN)
   return {
     sbPoints,
     bbPoints,
@@ -525,8 +599,9 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
     stackBBTenths: bbPoints && sizeOk ? divRound(stackPoints * 10, bbPoints) : 0,
     centsPerPoint: stackPoints > 0 && sizeOk && settingsOk ? fraction(buyInCents, stackPoints) : null,
     chipsPerPlayer: used.reduce((s, c) => s + c.perPlayer, 0),
+    smallChipsPerPlayer: smallest?.perPlayer ?? 0,
     colors: rows,
-    rebuysPossible: rebuysPossible === Infinity ? 0 : rebuysPossible,
+    rebuysPossible,
     issues,
   }
 }

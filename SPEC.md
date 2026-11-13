@@ -148,12 +148,13 @@ Option (interrupteur) pour empêcher la mise en veille du téléphone pendant la
 - **BB en € = buy-in ÷ profondeur** (par exemple 20 € et 100 BB donnent une BB à 0,20 €). Les montants en € n'ont pas à être ronds.
 - Les valeurs en points suivent autant que possible une suite « ronde » : 1, 2, 5, 10, 25, 50, 100, 250, 500, 1 000…
 - Stack de départ par joueur = profondeur × BB, en points.
-- Contrainte de stock : pour chaque couleur, nb par joueur × nb max de joueurs × (1 + recaves attendues) ≤ quantité disponible.
+- Contrainte de stock : pour chaque couleur, nb par joueur × nb max de joueurs ≤ quantité disponible (stacks de départ).
+- **Recaves à part** (idée reprise de [poker-chipper](https://github.com/jstrieb/poker-chipper)) : la réserve des couleurs utilisées doit permettre de composer nb max de joueurs × recaves attendues recaves d'un stack chacune, **dans n'importe quelle composition**, gros jetons d'abord (par exemple 2 jetons de 100 pour une recave de 200 pts). Une recave n'a pas à reproduire le stack de départ.
 - Une couleur peut rester entièrement en réserve, si c'est utile.
 
 ### 5.3 Objectif : liquidité maximale
 L'algorithme cherche la répartition qui permet à **chaque joueur de miser n'importe quel montant et de rendre la monnaie** :
-- assez de jetons de la plus petite valeur par joueur pour payer les blinds plusieurs fois et faire l'appoint (ordre de grandeur : au moins 10) ;
+- assez de jetons de la plus petite valeur par joueur pour payer les blinds plusieurs fois et faire l'appoint (ordre de grandeur : au moins 10). **Contrainte souple** : 8 conseillés, 5 au minimum ; entre les deux, la répartition est proposée avec un avertissement plutôt que refusée ;
 - un écart raisonnable entre deux valeurs successives (rapport de 2 à 5, idéalement) ;
 - pour chaque valeur, assez de jetons de la valeur inférieure pour faire la monnaie ;
 - le moins possible de jetons de forte valeur dans le stack de départ.
@@ -162,7 +163,7 @@ Les couleurs les plus nombreuses reçoivent en priorité les plus petites valeur
 
 ### 5.4 Sortie
 - **Une seule proposition** : la meilleure.
-- Elle affiche la valeur de chaque couleur (en points et en €), la SB et la BB, la composition du stack de départ par joueur (nb de jetons de chaque couleur), le total par joueur (points, €, BB) et la réserve restante par couleur, avec le nombre de recaves qu'elle permet.
+- Elle affiche la valeur de chaque couleur (en points et en €), la SB et la BB, la composition du stack de départ par joueur (nb de jetons de chaque couleur), le total par joueur (points, €, BB) et la réserve restante par couleur, avec le nombre de recaves (gros jetons d'abord) qu'elle permet pour toute la table.
 - La proposition est **modifiable à la main** (valeurs et quantités par joueur) avant validation. Les totaux sont recalculés en direct.
 - **Si aucune répartition correcte n'existe**, un message clair indique la contrainte qui bloque et ce qu'on peut assouplir (moins de BB, moins de recaves prévues, moins de joueurs).
 - La validation crée la configuration jetons. Elle est verrouillée dès que la partie démarre.
