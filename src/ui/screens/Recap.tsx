@@ -60,9 +60,7 @@ export function Recap() {
 
   return (
     <main class="mx-auto flex min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-3.5 px-4 pt-3 pb-5">
-      <Header>
-        <span class="text-[13px] text-text-muted">Partie terminée</span>
-      </Header>
+      <Header />
       <p class="num -mt-1 text-body text-text-muted">{recapPeriod(game)}</p>
 
       <Card title="Balances">

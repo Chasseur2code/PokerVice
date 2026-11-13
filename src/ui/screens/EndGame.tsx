@@ -93,10 +93,8 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
     return (
       <main class={SCREEN}>
         <Header>
-          {cfg ? (
+          {cfg && (
             <Segmented label="Unité de saisie des stacks" options={ENTRY_UNITS} value={inputUnit} onChange={switchUnit} />
-          ) : (
-            <span class="text-[13px] text-text-muted">Fin de partie</span>
           )}
         </Header>
 
@@ -164,9 +162,7 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
 
   return (
     <main class={SCREEN}>
-      <Header>
-        <span class="text-[13px] text-text-muted">Fin de partie</span>
-      </Header>
+      <Header />
 
       {diff === 0 ? (
         <section class="rounded-card bg-surface px-4 py-4 shadow-card">
