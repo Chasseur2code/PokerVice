@@ -34,6 +34,7 @@ Les 11 étapes de `PLAN.md` sont faites (v1 complète : PWA installable et hors 
 - Preact : attribut `class` (pas `className`) ; `react` est aliasé vers `preact/compat` dans `tsconfig.app.json`.
 - PWA : `vite-plugin-pwa` (`generateSW`, `autoUpdate`) dans `vite.config.ts` ; le glob ne prend que js/css/html/woff2 (icônes du manifest et `includeAssets` ajoutés par le plugin, sinon doublons). Dans Git Bash, `BASE_PATH=/PokerVice/` est réécrit en chemin Windows : préfixer `MSYS_NO_PATHCONV=1`.
 - Bandeau d'installation : `ui/install.ts` (store à part, clé `localStorage['pokervice-install']`, capture de `beforeinstallprompt` dès le chargement) + `InstallBanner`, seulement dans `Setup`. Visible si `(pointer: coarse) and (hover: none)`, pas en `display-mode: standalone`, pas fermé. Il apparaît dans les tests e2e (Pixel 7) ; `INSTALL_CHROME` réduit la table en portrait.
+- Écran de chargement (`#boot`) en HTML/CSS en ligne dans `index.html` (premier lancement : message d'installation, choisi selon `navigator.serviceWorker.controller`), visible après 300 ms, retiré par `main.tsx` après `render`. Couleurs en dur là seulement (la feuille de l'app n'est pas chargée).
 - `base` de Vite vient de `BASE_PATH` (fourni par `.github/workflows/deploy.yml` = `/<nom-du-dépôt>/`), `/` en local.
 
 ## Architecture visée (SPEC §10)

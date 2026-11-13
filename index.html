@@ -6,7 +6,11 @@
     <meta name="theme-color" content="#F5F1E9" />
     <meta name="description" content="Gérer une partie de poker cash game entre amis." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- iOS ignore le manifest pour l'icône et le nom de l'écran d'accueil : il lit ces balises. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="PokerVice" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>PokerVice</title>
     <!-- Thème appliqué avant le premier affichage (pas de flash clair), même logique que src/ui/theme.ts. -->
     <script>
@@ -17,8 +21,44 @@
         if (t === 'dark') document.querySelector('meta[name="theme-color"]').content = '#17120D'
       } catch (e) {}
     </script>
+    <!--
+      Écran de chargement, en attendant le JS (premier lancement, réseau lent) : pas de page blanche.
+      Styles en ligne, car la feuille de l'app n'est pas encore là. Il n'apparaît qu'après 300 ms :
+      les lancements suivants, servis par le service worker, ne le montrent pas. Retiré par main.tsx.
+    -->
+    <style>
+      html { background: #f5f1e9; color: #2b2118; }
+      html[data-theme='dark'] { background: #17120d; color: #f3ece1; }
+      #boot {
+        position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 14px; padding: 24px; text-align: center; font: 15px/1.4 system-ui, sans-serif;
+        animation: boot-in 0.2s 0.3s both;
+      }
+      #boot svg { width: 88px; height: 88px; }
+      #boot .chip { transform-origin: 32px 32px; animation: boot-pulse 1.2s ease-in-out infinite; }
+      #boot strong { font: 700 24px/1.1 Georgia, serif; }
+      #boot p { margin: 0; max-width: 300px; opacity: 0.75; }
+      @keyframes boot-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes boot-pulse { 50% { transform: scale(0.75); } }
+      @media (prefers-reduced-motion: reduce) { #boot .chip { animation: none; } }
+    </style>
   </head>
   <body>
+    <div id="boot" role="status">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <ellipse cx="32" cy="32" rx="28" ry="22" fill="#6E4428" />
+        <ellipse cx="32" cy="32" rx="23" ry="17" fill="#217049" />
+        <circle class="chip" cx="32" cy="32" r="7" fill="#D4952A" />
+      </svg>
+      <strong>PokerVice</strong>
+      <p id="boot-text">Chargement…</p>
+    </div>
+    <script>
+      // Pas encore de service worker aux commandes : c'est le premier lancement, l'app se télécharge.
+      if (!('serviceWorker' in navigator && navigator.serviceWorker.controller))
+        document.getElementById('boot-text').textContent =
+          'Installation sur votre téléphone, pour fonctionner ensuite même sans connexion…'
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
