@@ -36,10 +36,10 @@ export function hideToast(): void {
 }
 
 /**
- * À placer une fois dans l'app. Par défaut, 12 px au-dessus de la barre d'actions
- * (52 px de haut, posée à max(20 px, safe-area) du bas).
+ * À placer une fois dans l'app. En haut de l'écran, 12 px sous la zone de sécurité : il ne couvre
+ * ni la barre d'actions, ni le bouton principal d'une sheet, ni le clavier virtuel.
  */
-export function ToastHost({ bottom = 'calc(max(20px, env(safe-area-inset-bottom)) + 64px)' }: { bottom?: string }) {
+export function ToastHost() {
   const toast = useStore(toastStore, (s) => s.toast)
   // On garde le dernier toast affiché pendant son fondu de sortie.
   const [shown, setShown] = useState<ToastData | null>(toast)
@@ -63,8 +63,7 @@ export function ToastHost({ bottom = 'calc(max(20px, env(safe-area-inset-bottom)
     <div
       role="status"
       aria-live="polite"
-      class="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
-      style={{ bottom }}
+      class="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+12px)] z-50 flex justify-center px-4"
     >
       {shown && (
         <div

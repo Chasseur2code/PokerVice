@@ -206,7 +206,7 @@ Bottom sheet avec le nom du joueur et sa pastille en en-tête, puis :
 Un appui long (400 ms) sur un siège le soulève : agrandissement à 1,05 et ombre plus forte. On le dépose sur un autre siège pour échanger les places. Aucune poignée visible n'est ajoutée.
 
 ### Toast « Annuler »
-- Il apparaît 12 px au-dessus de la barre d'actions, avec un fond `--toast-bg`, un texte blanc de 14 px et l'action « Annuler » en `--accent` (graisse 700).
+- Il apparaît en haut de l'écran, 12 px sous la zone de sécurité (il ne masque ni la barre d'actions ni le clavier), avec un fond `--toast-bg`, un texte blanc de 14 px et l'action « Annuler » en `--accent` (graisse 700).
 - Il reste 5 secondes, et un seul toast est affiché à la fois.
 
 ### Historique
@@ -231,7 +231,7 @@ Ils s'ouvrent en bottom sheet plein écran. On y reprend les cartes `--surface`,
 
 ## 6. Mouvement
 - Les bottom sheets s'ouvrent en 220 ms (`cubic-bezier(.2,.8,.2,1)`).
-- Les toasts apparaissent en 150 ms (fondu et montée de 8 px).
+- Les toasts apparaissent en 150 ms (fondu et descente de 8 px).
 - Au tap, un siège descend à `scale(.97)`.
 - Respecter `prefers-reduced-motion` en supprimant les translations.
 - Pas d'animation sur le chrono, seulement le changement du texte.
