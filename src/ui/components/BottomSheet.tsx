@@ -3,6 +3,7 @@
 import type { ComponentChildren, RefObject } from 'preact'
 import { createPortal } from 'preact/compat'
 import { useEffect, useId, useRef, useState } from 'preact/hooks'
+import { focusOrigin } from '../keyboard'
 
 const DURATION_MS = 220
 /** Au-delà de ce déplacement (px) ou de cette vitesse (px/ms), le glissement ferme la sheet. */
@@ -65,20 +66,27 @@ export function BottomSheet({ open, onClose, title, children, footer, full = fal
   // Échap, blocage du défilement de la page, et retour du focus à l'élément d'origine.
   useEffect(() => {
     if (!mounted) return
-    const previous = document.activeElement as HTMLElement | null
+    const previous = focusOrigin()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
     lockScroll()
-    const el = initialFocus?.current ?? panel.current
-    el?.focus({ preventScroll: true })
     return () => {
       document.removeEventListener('keydown', onKey)
       unlockScroll()
       previous?.focus?.({ preventScroll: true })
     }
   }, [mounted])
+
+  // Focus à chaque ouverture, y compris une réouverture pendant l'animation de sortie (toujours montée).
+  // Après l'effet ci-dessus, qui a noté l'élément d'origine.
+  const visible = mounted && open
+  useEffect(() => {
+    if (!visible) return
+    const el = initialFocus?.current ?? panel.current
+    el?.focus({ preventScroll: true })
+  }, [visible])
 
   // Glissement vers le bas : on écrit directement le style (pas de re-rendu à chaque mouvement).
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null)

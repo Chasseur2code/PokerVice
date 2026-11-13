@@ -30,6 +30,7 @@ import { HistorySheet } from '../sheets/HistorySheet'
 import { LeftPlayersSheet } from '../sheets/LeftPlayersSheet'
 import { PlayerMenuSheet } from '../sheets/PlayerMenuSheet'
 import { PlayerSheet } from '../sheets/PlayerSheet'
+import { openKeyboard } from '../keyboard'
 import { showUndoToast } from '../undo'
 
 type Sheet = 'menu' | 'player' | 'left' | 'history' | 'chipHelp' | 'assistant' | 'converter' | 'chipInfo' | 'finish' | null
@@ -98,6 +99,7 @@ export function Game() {
 
   const addPlayer = () => {
     if (stats.seatedCount >= MAX_SEATED) return showToast(`La table est complète (${MAX_SEATED} joueurs).`)
+    openKeyboard()
     setPlayerId(null)
     setSheet('player')
   }
@@ -105,6 +107,12 @@ export function Game() {
   const startEnding = () => {
     close()
     setEnding(true)
+  }
+
+  // Retour à l'accueil sans stacks ni récap : tout est effacé (sauf le buy-in), « Annuler » pendant 5 s.
+  const abandon = () => {
+    close()
+    if (gameStore.getState().newGame()) showUndoToast('Partie abandonnée')
   }
 
   const swap = (a: string, b: string) => {
@@ -241,6 +249,7 @@ export function Game() {
         onClose={close}
         playerId={playerId}
         onEdit={(id) => {
+          openKeyboard()
           setPlayerId(id)
           setSheet('player')
         }}
@@ -257,7 +266,18 @@ export function Game() {
       <ChipAssistantSheet open={sheet === 'assistant'} onClose={close} />
       <ConverterSheet open={sheet === 'converter'} onClose={close} />
       <ChipInfoSheet open={sheet === 'chipInfo'} onClose={close} />
-      <ConfirmSheet open={sheet === 'finish'} onClose={close} title="Terminer la partie ?" confirmLabel="Compter les stacks" onConfirm={startEnding}>
+      <ConfirmSheet
+        open={sheet === 'finish'}
+        onClose={close}
+        title="Terminer la partie ?"
+        confirmLabel="Compter les stacks"
+        onConfirm={startEnding}
+        secondary={
+          <button type="button" onClick={abandon} class="h-11 px-2 text-body font-semibold text-loss">
+            Abandonner la partie (sans récap)
+          </button>
+        }
+      >
         {stats.seatedCount === 0
           ? 'Tous les joueurs sont partis : on vérifie les comptes, puis la partie est close.'
           : `On saisit le stack final de chaque joueur assis (${stats.seatedCount}). Une fois validée, la partie est close et ne pourra plus être modifiée.`}

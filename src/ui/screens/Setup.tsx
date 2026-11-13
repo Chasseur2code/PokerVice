@@ -18,6 +18,7 @@ import { ChipAssistantSheet } from '../sheets/ChipAssistantSheet'
 import { ChipHelpSheet } from '../sheets/ChipHelpSheet'
 import { ConverterSheet } from '../sheets/ConverterSheet'
 import { PlayerSheet } from '../sheets/PlayerSheet'
+import { openKeyboard } from '../keyboard'
 
 type Sheet = 'buyIn' | 'player' | 'chipHelp' | 'assistant' | 'converter' | null
 
@@ -43,6 +44,8 @@ export function Setup() {
 
   const close = () => setSheet(null)
   const openPlayer = (id: string | null) => {
+    // Pendant le tap : le clavier s'ouvre tout de suite pour le prénom.
+    openKeyboard()
     setPlayerId(id)
     setSheet('player')
   }
@@ -166,7 +169,7 @@ export function Setup() {
         </>
       ) : (
         <>
-          <Header>{cfg ? <UnitToggle /> : <span class="text-[13px] text-text-muted">Nouvelle partie</span>}</Header>
+          <Header>{cfg && <UnitToggle />}</Header>
           {buyInCard}
           {table}
           {startHere}

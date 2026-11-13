@@ -5,15 +5,21 @@
 import { useId, useMemo, useState } from 'preact/hooks'
 import { computeStats, summarizePlayers } from '../../lib/derive'
 import { discrepancyMessage, previewFinalBalances, type FinalStack } from '../../lib/discrepancy'
-import { amountToInput, formatAmount, formatEquivalent, inputUnitFor, parseAmountKeeping } from '../../lib/units'
+import { amountToInput, formatAmount, formatEquivalent, parseAmountKeeping, type InputUnit } from '../../lib/units'
 import type { DiscrepancyResolution } from '../../lib/types'
 import { gameStore, useGame } from '../../store/useGame'
 import { PrimaryButton, SecondaryButton } from '../components/Button'
 import { Header } from '../components/Header'
 import { NumberField } from '../components/NumberField'
 import { PlayerDot } from '../components/PlayerDot'
+import { Segmented, type SegmentedOption } from '../components/Segmented'
 import { showToast } from '../components/Toast'
 import { showUndoToast } from '../undo'
+
+const ENTRY_UNITS: readonly SegmentedOption<InputUnit>[] = [
+  { value: 'eur', label: '€', ariaLabel: 'Euros' },
+  { value: 'pts', label: 'Pts', ariaLabel: 'Points' },
+]
 
 const SCREEN = 'mx-auto flex min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-3.5 px-4 pt-3 pb-5'
 
@@ -21,7 +27,9 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
   const game = useGame((s) => s.game)
   const unit = useGame((s) => s.unit)
   const cfg = game.chipConfig
-  const inputUnit = inputUnitFor(unit, cfg)
+  // Les stacks se comptent en jetons : saisie en points par défaut s'il y a une config jetons
+  // (sinon, la valeur d'un point est inconnue : tout en €). Choix local à cet écran.
+  const [inputUnit, setInputUnit] = useState<InputUnit>(cfg ? 'pts' : 'eur')
   const formId = useId()
 
   const { seated, moneyInPlayCents } = useMemo(() => {
@@ -40,6 +48,7 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
   const [assigning, setAssigning] = useState(false)
 
   const fmt = (cents: number) => formatAmount(cents, unit, cfg, { compact: true })
+  const fmtInput = (cents: number) => formatAmount(cents, inputUnit, cfg, { compact: true })
 
   const goTo = (i: number, list = stacks) => {
     const known = list[i]
@@ -75,10 +84,20 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
       else goTo(n, next)
     }
 
+    // Changer d'unité convertit la saisie en cours (les stacks déjà validés sont en centimes).
+    const switchUnit = (u: InputUnit) => {
+      setValue(valid ? amountToInput(cents, u, cfg) : '')
+      setInputUnit(u)
+    }
+
     return (
       <main class={SCREEN}>
         <Header>
-          <span class="text-[13px] text-text-muted">Fin de partie</span>
+          {cfg ? (
+            <Segmented label="Unité de saisie des stacks" options={ENTRY_UNITS} value={inputUnit} onChange={switchUnit} />
+          ) : (
+            <span class="text-[13px] text-text-muted">Fin de partie</span>
+          )}
         </Header>
 
         <div class="flex flex-col gap-1.5" aria-label={`Joueur ${step + 1} sur ${n}`}>
@@ -99,7 +118,7 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
             class={`num font-display text-hero font-bold ${remaining === 0 ? 'text-gain' : remaining < 0 ? 'text-loss' : ''}`}
             aria-live="polite"
           >
-            {fmt(remaining)}
+            {fmtInput(remaining)}
           </p>
         </section>
 

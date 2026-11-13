@@ -23,7 +23,7 @@ export const STORAGE_KEY = 'pokervice'
 /** Version du schéma persisté : l'incrémenter impose d'écrire la migration dans `migrate`. */
 export const SCHEMA_VERSION = 1
 export const UNDO_MS = 5000
-export const DEFAULT_BUY_IN_CENTS = 2000
+export const DEFAULT_BUY_IN_CENTS = 1000
 
 export interface LastRecap {
   /** Partie terminée, figée (statut `finished`, événements `final` compris). */

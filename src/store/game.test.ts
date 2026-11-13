@@ -42,6 +42,8 @@ beforeEach(() => {
   vi.setSystemTime(T0)
   storage = memoryStorage()
   store = createGameStore(storage)
+  // Les montants des tests sont écrits pour une table à 20 € (le défaut est 10 €, testé à part).
+  s().setBuyIn(2000)
 })
 
 afterEach(() => {
@@ -49,9 +51,10 @@ afterEach(() => {
 })
 
 describe('préparation', () => {
-  it('démarre sur une table vide à 20 €', () => {
+  it('démarre sur une table vide à 10 €', () => {
+    store = createGameStore(memoryStorage())
     expect(s().game.status).toBe('setup')
-    expect(s().game.defaultBuyInCents).toBe(2000)
+    expect(s().game.defaultBuyInCents).toBe(1000)
     expect(s().lastRecap).toBeNull()
     expect(s().unit).toBe('eur')
   })

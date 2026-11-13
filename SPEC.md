@@ -90,7 +90,7 @@ Arrivée sur le site
 L'écran doit guider sans texte superflu. **Aucune stat n'est affichée** (elles vaudraient toutes zéro).
 De haut en bas :
 1. **En-tête** : logo « PokerVice ».
-2. **Carte buy-in** : « Buy-in par joueur : 20 € », avec un bouton « Modifier ».
+2. **Carte buy-in** : « Buy-in par joueur : 10 € » (10 € par défaut, puis le dernier buy-in utilisé), avec un bouton « Modifier ».
 3. **La table** : sièges vides « + » en pointillés. Le siège du bas (le plus proche du pouce) est **mis en avant** avec la couleur d'accent et la mention « Commencez ici », qui disparaît dès le premier joueur ajouté. Au centre : « Installez vos joueurs » et « Touchez un siège + pour ajouter quelqu'un. 2 joueurs minimum. »
 4. **Lien discret** « Besoin d'aide pour les jetons ? » (voir §3, §5, §6).
 5. **Bouton « Démarrer la partie »**, grisé tant qu'il y a moins de 2 joueurs, puis en couleur d'accent.
@@ -209,8 +209,8 @@ Il est consultable **pendant la partie** (dans un panneau) et **dans le récap f
 ## 8. Fin de partie
 
 ### 8.1 Saisie des stacks finaux
-- « Terminer la partie » demande une **confirmation**.
-- L'app passe joueur par joueur (les joueurs assis), avec la saisie du stack final en € ou en points.
+- « Terminer la partie » demande une **confirmation**. La même confirmation propose aussi **« Abandonner la partie (sans récap) »** : retour à une table vide, sans saisie des stacks ni récap (annulable 5 s).
+- L'app passe joueur par joueur (les joueurs assis), avec la saisie du stack final en € ou en points : une bascule € | Pts propre à cet écran, sur **Pts par défaut** s'il existe une configuration jetons (sinon tout en €).
 - Un compteur **« Reste à attribuer »** part de l'argent total en jeu et diminue jusqu'à 0.
 
 ### 8.2 Écart de comptage
