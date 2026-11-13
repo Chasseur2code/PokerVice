@@ -233,12 +233,12 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
                       class="w-20"
                     />
                     <CompactField
-                      label={`Valeur imposée d'un jeton ${row.name}, en points (vide : libre)`}
+                      label={`Valeur imposée d'un jeton ${row.name}, en points (vide : PokerVice choisit la meilleure)`}
                       hideLabel
                       value={row.value}
                       onInput={(value) => updateStock(row.id, { value })}
                       inputMode="numeric"
-                      placeholder="libre"
+                      placeholder="auto"
                       invalid={valueInvalid(row)}
                       class="w-20"
                     />
@@ -284,7 +284,7 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
               {!stockValid && <p class="text-[13px] text-text-muted">Indiquez un nom et une quantité pour chaque couleur.</p>}
               {valuesValid ? (
                 <p class="text-[13px] text-text-muted">
-                  Valeur : laissez « libre » pour que l'assistant la choisisse, ou imposez celle imprimée sur vos jetons.
+                  Sans valeur, PokerVice choisit la meilleure.
                 </p>
               ) : (
                 <p class="text-[13px] text-loss">
