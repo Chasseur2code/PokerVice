@@ -91,7 +91,7 @@ Chaque étape suit la même fin : `npm run test` et `npm run build` passent, mis
 - Convertisseur (SPEC §6) avec une calculatrice ; assistant (SPEC §5) en sheet plein écran : formulaire, proposition modifiable, message d'échec ; bascule segmentée € | Pts | BB dans l'en-tête ; bandeau jetons dépliable ; bouton « Jetons » dans la barre quand il n'y a pas de bandeau ; saisies en points dans les sheets ; verrouillage après « Démarrer ».
 - **Vérif** : une partie avec l'assistant, une partie avec le convertisseur et une partie sans configuration. Dans ce dernier cas, **aucune** mention de jeton ne doit apparaître.
 
-### [ ] Étape 9 — Fin de partie et récap
+### [x] Étape 9 — Fin de partie et récap
 - Confirmation, puis saisie joueur par joueur (progression « 3 / 6 », « Reste à attribuer » en vert ou rouge), carte d'écart avec Corriger, Prorata et Imputer à…, récap (balances triées avec le signe, virements, interrupteur « Arrondir à l'euro », stats et historique repliables), `lib/recapText.ts` au format exact de SPEC §8.3 avec copie dans le presse-papiers, « Nouvelle partie » avec confirmation, partie non rouvrable.
 - **Vérif** : test unitaire du texte WhatsApp ; un joueur parti avant la fin apparaît dans les virements (critère 3).
 

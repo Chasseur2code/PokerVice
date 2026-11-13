@@ -139,3 +139,19 @@ export function finalBalances(game: Pick<Game, 'players' | 'events' | 'chipConfi
   }
   return { balances, stacks: resolved, discrepancyCents: diff, resolved: true }
 }
+
+/**
+ * finalBalances de la partie telle que `finish` la clôturerait avec ces stacks finaux : écart brut
+ * (sans résolution), ou validité d'un prorata / d'une imputation, avant de valider.
+ */
+export function previewFinalBalances(
+  game: Pick<Game, 'players' | 'events' | 'chipConfig'>,
+  finals: readonly FinalStack[],
+  resolution?: DiscrepancyResolution,
+): FinalBalances {
+  const events = [
+    ...game.events,
+    ...finals.map((f, i) => ({ id: `preview-${i}`, at: 0, type: 'final' as const, playerId: f.playerId, amountCents: f.cents })),
+  ]
+  return finalBalances({ ...game, events, discrepancyResolution: resolution })
+}

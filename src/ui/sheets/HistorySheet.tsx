@@ -157,14 +157,14 @@ export function HistorySheet({ open, onClose }: { open: boolean; onClose: () => 
   )
 }
 
-interface EventRowProps {
+export interface EventRowProps {
   ev: GameEvent
   player: { name: string; color: string } | undefined
   amount: string
   onClick?: () => void
 }
 
-function EventRow({ ev, player, amount, onClick }: EventRowProps) {
+export function EventRow({ ev, player, amount, onClick }: EventRowProps) {
   const content = (
     <>
       <span class="num w-11 shrink-0 text-[13px] text-text-muted">{timeFmt.format(ev.at)}</span>

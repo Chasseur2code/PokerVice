@@ -11,6 +11,7 @@ import { formatAmount } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
 import { IconButton, PrimaryButton } from '../components/Button'
 import { ChipBand } from '../components/ChipBand'
+import { ConfirmSheet } from '../components/ConfirmSheet'
 import { Chrono } from '../components/Chrono'
 import { Header } from '../components/Header'
 import { SignedAmount } from '../components/PlayerDot'
@@ -20,6 +21,7 @@ import { showToast } from '../components/Toast'
 import { UnitToggle } from '../components/UnitToggle'
 import { useOrientation } from '../hooks/useOrientation'
 import { useWakeLock, wakeLockSupported } from '../hooks/useWakeLock'
+import { EndGame } from './EndGame'
 import { ChipAssistantSheet } from '../sheets/ChipAssistantSheet'
 import { ChipHelpSheet } from '../sheets/ChipHelpSheet'
 import { ChipInfoSheet } from '../sheets/ChipInfoSheet'
@@ -30,7 +32,7 @@ import { PlayerMenuSheet } from '../sheets/PlayerMenuSheet'
 import { PlayerSheet } from '../sheets/PlayerSheet'
 import { showUndoToast } from '../undo'
 
-type Sheet = 'menu' | 'player' | 'left' | 'history' | 'chipHelp' | 'assistant' | 'converter' | 'chipInfo' | null
+type Sheet = 'menu' | 'player' | 'left' | 'history' | 'chipHelp' | 'assistant' | 'converter' | 'chipInfo' | 'finish' | null
 
 /**
  * Hauteur prise en portrait par tout ce qui n'est pas la table (en-tête, stats, barre d'actions,
@@ -51,6 +53,8 @@ export function Game() {
   const [sheet, setSheet] = useState<Sheet>(null)
   // Gardé après la fermeture pour que la sheet ne change pas de contenu pendant son animation de sortie.
   const [playerId, setPlayerId] = useState<string | null>(null)
+  // Saisie des stacks finaux en cours (écran EndGame, état local jusqu'à `finish`).
+  const [ending, setEnding] = useState(false)
   const close = () => setSheet(null)
 
   useWakeLock(game.wakeLock, () => {
@@ -63,6 +67,8 @@ export function Game() {
     const summaries = summarizePlayers(game)
     return { summaries, stats: computeStats(game, summaries) }
   }, [game])
+
+  if (ending) return <EndGame onCancel={() => setEnding(false)} />
 
   const fmt = (cents: number, sign = false) => formatAmount(cents, unit, cfg, { compact: !sign, sign })
 
@@ -96,11 +102,9 @@ export function Game() {
     setSheet('player')
   }
 
-  // Provisoire jusqu'à l'étape 9 (saisie des stacks finaux, écart, récap).
-  const finish = () => {
-    if (!window.confirm('La fin de partie (stacks finaux et récap) arrive bientôt.\nEn attendant, abandonner cette partie ?')) return
-    gameStore.getState().newGame()
-    showUndoToast('Partie abandonnée')
+  const startEnding = () => {
+    close()
+    setEnding(true)
   }
 
   const swap = (a: string, b: string) => {
@@ -196,7 +200,7 @@ export function Game() {
           <Coins size={22} strokeWidth={2} aria-hidden="true" />
         </IconButton>
       )}
-      <PrimaryButton class="h-[52px]! min-w-0" onClick={finish}>
+      <PrimaryButton class="h-[52px]! min-w-0" onClick={() => setSheet('finish')}>
         Terminer la partie
       </PrimaryButton>
     </div>
@@ -251,6 +255,11 @@ export function Game() {
       <ChipAssistantSheet open={sheet === 'assistant'} onClose={close} />
       <ConverterSheet open={sheet === 'converter'} onClose={close} />
       <ChipInfoSheet open={sheet === 'chipInfo'} onClose={close} />
+      <ConfirmSheet open={sheet === 'finish'} onClose={close} title="Terminer la partie ?" confirmLabel="Compter les stacks" onConfirm={startEnding}>
+        {stats.seatedCount === 0
+          ? 'Tous les joueurs sont partis : on vérifie les comptes, puis la partie est close.'
+          : `On saisit le stack final de chaque joueur assis (${stats.seatedCount}). Une fois validée, la partie est close et ne pourra plus être modifiée.`}
+      </ConfirmSheet>
     </main>
   )
 }
