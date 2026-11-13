@@ -9,6 +9,19 @@ const DURATION_MS = 220
 const DRAG_CLOSE_PX = 80
 const DRAG_CLOSE_SPEED = 0.5
 
+/**
+ * Blocage du défilement de la page, compté : deux sheets se chevauchent quand l'une s'ouvre pendant
+ * la sortie de l'autre. Avec une simple sauvegarde/restauration de `overflow`, la seconde notait
+ * « hidden » comme valeur d'origine et laissait la page bloquée après sa fermeture.
+ */
+let scrollLocks = 0
+function lockScroll() {
+  if (scrollLocks++ === 0) document.body.style.overflow = 'hidden'
+}
+function unlockScroll() {
+  if (--scrollLocks === 0) document.body.style.overflow = ''
+}
+
 export interface BottomSheetProps {
   open: boolean
   onClose: () => void
@@ -57,13 +70,12 @@ export function BottomSheet({ open, onClose, title, children, footer, full = fal
       if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKey)
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    lockScroll()
     const el = initialFocus?.current ?? panel.current
     el?.focus({ preventScroll: true })
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
+      unlockScroll()
       previous?.focus?.({ preventScroll: true })
     }
   }, [mounted])

@@ -1,5 +1,5 @@
 // Récap de la partie terminée (SPEC §8.3-8.4, DESIGN §5) : balances (partis compris), virements
-// minimaux, « Arrondir à l'euro », copie pour WhatsApp, stats et historique repliables.
+// minimaux, « Arrondir à l'euro », partage du texte (WhatsApp, Snapchat…), stats et historique repliables.
 // Tout est en euros : ce sont de vrais virements. La partie est close ; seul « Nouvelle partie » en sort.
 import type { ComponentChildren } from 'preact'
 import { ChevronDown } from 'lucide-preact'
@@ -16,7 +16,7 @@ import { ConfirmSheet } from '../components/ConfirmSheet'
 import { Header } from '../components/Header'
 import { PlayerDot, SignedAmount } from '../components/PlayerDot'
 import { showToast } from '../components/Toast'
-import { copyText } from '../clipboard'
+import { canShare, shareText } from '../share'
 import { EventRow } from '../sheets/HistorySheet'
 import { showUndoToast } from '../undo'
 
@@ -43,9 +43,10 @@ export function Recap() {
   const transfers = rounded ? roundTransfers(recap.transfers) : recap.transfers
   const eur = (c: number) => formatCents(c, { compact: true })
 
-  const copy = async () => {
-    const ok = await copyText(recapText(game, rows, transfers))
-    showToast(ok ? 'Récap copié : collez-le dans WhatsApp.' : 'Copie impossible sur ce navigateur.')
+  const share = async () => {
+    const result = await shareText(recapText(game, rows, transfers))
+    if (result === 'copied') showToast('Récap copié : collez-le dans la conversation de votre choix.')
+    if (result === 'failed') showToast('Partage impossible sur ce navigateur.')
   }
 
   const startNew = () => {
@@ -124,7 +125,7 @@ export function Recap() {
         </label>
       </Card>
 
-      <PrimaryButton onClick={copy}>Copier pour WhatsApp</PrimaryButton>
+      <PrimaryButton onClick={share}>{canShare ? 'Partager le récap' : 'Copier le récap'}</PrimaryButton>
 
       <Collapsible title="Statistiques">
         <dl class="flex flex-col gap-1.5 pb-3 text-body">

@@ -1,4 +1,4 @@
-// Texte brut « Copier pour WhatsApp » (SPEC §8.3), au format exact :
+// Texte brut du récap à partager (SPEC §8.3, « Copier pour WhatsApp »), au format exact :
 //
 //   PokerVice — 05/11/2026 · 20:12 → 01:47 (5h35)
 //
