@@ -30,6 +30,7 @@
   --color-brand-green: #1f6b45;
   --color-gain: #1c6b3f;
   --color-loss: #b42318;
+  --color-on-loss: #ffffff;
   --color-disabled-bg: #e4dacb;
   --color-toast-bg: #2b2118;
   /* Gain / perte lisibles sur le fond sombre du toast (contraste ≥ 4,5:1). */
@@ -114,6 +115,34 @@
   --wood-width: 14px;
   --rail-inset: 28px;
   --rail-border: 1px solid rgba(255, 255, 255, 0.22);
+  --backdrop: rgba(43, 33, 24, 0.4);
+}
+
+/*
+ * Mode sombre (`data-theme` posé par index.html puis ui/theme.ts) : mêmes tokens, valeurs sombres et
+ * chaudes. Les classes Tailwind lisant var(--color-x), tout l'écran bascule sans toucher aux composants.
+ * L'ambre et le texte sur l'ambre restent les mêmes ; la table (feutre, bois, couleurs des joueurs et
+ * des jetons) aussi.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #17120d;
+  --color-surface: #241d16;
+  --color-surface-muted: #342b22;
+  --color-border: #3a3027;
+  --color-border-strong: #4f4235;
+  --color-border-dashed: #7d6c58;
+  --color-text: #f3ece1;
+  --color-text-muted: #bba892;
+  --color-text-faint: #918069;
+  --color-accent-text: #e9b25c;
+  --color-brand-green: #4fbf83;
+  --color-gain: #5fcb8e;
+  --color-loss: #ff8b7e;
+  --color-on-loss: #2b0c07;
+  --color-disabled-bg: #3a3027;
+  --color-toast-bg: #3e332a;
+  --backdrop: rgba(0, 0, 0, 0.6);
 }
 
 @layer base {
@@ -145,7 +174,7 @@
 
 /* Bottom sheet : glisse depuis le bas en mobile, fondu + légère montée en modale (≥ 768 px). */
 .sheet-backdrop {
-  background: rgba(43, 33, 24, 0.4);
+  background: var(--backdrop);
   opacity: 0;
   transition: opacity 220ms var(--ease-sheet);
 }

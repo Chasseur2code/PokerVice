@@ -45,6 +45,9 @@
 | `--loss` | `#B42318` | Balances négatives |
 | `--disabled-bg` | `#E4DACB` | Bouton principal désactivé (texte `--text-faint`) |
 | `--toast-bg` | `#2B2118` | Toast « Annuler » (texte blanc, action en `--accent`) |
+| `--on-loss` | `#FFFFFF` | Texte sur un bouton `--loss` (« Supprimer ») |
+
+**Mode sombre** : mêmes tokens, redéfinis sous `:root[data-theme='dark']` dans `src/styles/index.css` (fond `#17120D`, surfaces `#241D16`, texte `#F3ECE1`, `--accent-text` `#E9B25C`, gain/perte éclaircis, `--on-loss` foncé). L'ambre, `--on-accent`, la table et les couleurs des joueurs et des jetons ne changent pas.
 
 ### 2.2 La table
 | Élément | Valeur |
@@ -110,7 +113,7 @@ On dessine chaque pastille avec un fond plein et un anneau intérieur de 3 px (`
 - **Hauteurs** : bouton principal de 52 à 56 px, boutons icônes de 52 × 52 px, segments de 34 px (avec une zone tactile d'au moins 44 px grâce au padding du conteneur), lignes repliables de 44 px.
 
 ### 2.7 Icônes
-Icônes au trait, épaisseur 2 px, bouts arrondis, 22 px (type Lucide). Celles utilisées : `user-plus` (ajouter un joueur), `clock` (historique), `plus` (siège vide), `chevron-down` (déplier), `pencil` (modifier), `sun` (écran allumé), `coins` (jetons, quand il n'y a pas de bandeau). Tout bouton qui n'a qu'une icône doit avoir un `aria-label`.
+Icônes au trait, épaisseur 2 px, bouts arrondis, 22 px (type Lucide). Celles utilisées : `user-plus` (ajouter un joueur), `clock` (historique), `plus` (siège vide), `chevron-down` (déplier), `pencil` (modifier), `moon` (mode sombre, pleine quand il est actif), `sun` (écran allumé), `coins` (jetons, quand il n'y a pas de bandeau). Tout bouton qui n'a qu'une icône doit avoir un `aria-label`.
 
 ---
 
@@ -158,7 +161,7 @@ De haut en bas, dans une colonne flex :
 1. **En-tête** (40 px) :
    - à gauche, le logo ;
    - à droite, la **bascule segmentée € | Pts | BB** (conteneur `--surface-muted`, segment actif `--surface` avec une ombre légère et un texte de graisse 700). Elle n'apparaît que si une configuration jetons existe ;
-   - entre les deux, le bouton icône « Écran allumé » (`sun`, 44 px), qui passe en `--accent` quand il est actif.
+   - entre les deux, le bouton icône « Mode sombre » (`moon`, 44 px, présent sur tous les écrans, intégré à `Header`), puis le bouton icône « Écran allumé » (`sun`, 44 px), qui passe en `--accent` quand il est actif.
 2. **Carte de stats** (`--surface`, rayon 16), en deux colonnes :
    - **Gauche** (flexible), avec un filet de 4 px `--accent` sur le bord gauche :
      - le libellé « TAPIS MOYEN » (12 px, capitales, `--accent-text`) ;

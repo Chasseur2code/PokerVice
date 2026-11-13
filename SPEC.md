@@ -304,7 +304,7 @@ Les balances et les stats sont **dérivées** des événements, jamais stockées
 
 ## 11. Hors périmètre v1 (à faire plus tard)
 
-- [ ] **Mode sombre**
+- [x] **Mode sombre** (fait le 2026-11-13 : bouton lune dans l'en-tête, suit le système tant qu'on n'a rien choisi)
 - [ ] **Emoji par joueur**
 - [ ] **Mode tableau** (vue liste ou tableau des joueurs, alternative à la table ovale)
 - [ ] **Transferts entre joueurs** : (a) achat de jetons entre joueurs, (b) prêt pour une recave, (c) remboursement déjà fait pendant la soirée

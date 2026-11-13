@@ -185,7 +185,7 @@ export function Game() {
     <button
       type="button"
       onClick={() => setSheet('left')}
-      class="flex h-11 w-full shrink-0 items-center gap-1.5 rounded-row border border-[#E2D8C8] px-3.5 text-left text-body active:bg-surface-muted"
+      class="flex h-11 w-full shrink-0 items-center gap-1.5 rounded-row border border-border-strong px-3.5 text-left text-body active:bg-surface-muted"
     >
       <span class="min-w-0 flex-1 truncate">
         {left.length} parti{left.length > 1 ? 's' : ''} · <strong class="font-semibold">{lastLeft.player.name}</strong>{' '}

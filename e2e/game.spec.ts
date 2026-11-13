@@ -138,3 +138,17 @@ test('« Mallette de Félix » remplit les couleurs, et l’assistant laisse les
   await assistant.getByRole('button', { name: 'Proposer une répartition' }).click()
   await expect(assistant.getByRole('button', { name: 'Valider la répartition' })).toBeEnabled()
 })
+
+test('le mode sombre se bascule par la lune et survit au rechargement', async ({ page }) => {
+  const html = page.locator('html')
+  const moon = page.getByRole('button', { name: 'Mode sombre' })
+  await expect(html).toHaveAttribute('data-theme', 'light')
+  await moon.click()
+  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await expect(moon).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#17120D')
+  await page.reload()
+  await expect(html).toHaveAttribute('data-theme', 'dark')
+  await page.getByRole('button', { name: 'Mode sombre' }).click()
+  await expect(html).toHaveAttribute('data-theme', 'light')
+})

@@ -108,7 +108,7 @@ export function HistorySheet({ open, onClose }: { open: boolean; onClose: () => 
       <button
         type="button"
         onClick={remove}
-        class="flex h-14 w-full items-center justify-center rounded-btn bg-loss px-4 text-btn font-bold text-white active:brightness-95"
+        class="flex h-14 w-full items-center justify-center rounded-btn bg-loss px-4 text-btn font-bold text-on-loss active:brightness-95"
       >
         Supprimer
       </button>
