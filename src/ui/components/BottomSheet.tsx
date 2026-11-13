@@ -79,6 +79,28 @@ export function BottomSheet({ open, onClose, title, children, footer, full = fal
     }
   }, [mounted])
 
+  // Clavier virtuel : Chrome Android (depuis la v108) et iOS ne réduisent que la zone visible
+  // (visual viewport), pas la page ; une sheet collée en bas resterait derrière le clavier.
+  // On cale le conteneur sur la zone visible, écrite directement dans le style (pas de re-rendu).
+  const layer = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!mounted || !vv) return
+    const fit = () => {
+      const el = layer.current
+      if (!el) return
+      el.style.top = `${vv.offsetTop}px`
+      el.style.height = `${vv.height}px`
+    }
+    fit()
+    vv.addEventListener('resize', fit)
+    vv.addEventListener('scroll', fit)
+    return () => {
+      vv.removeEventListener('resize', fit)
+      vv.removeEventListener('scroll', fit)
+    }
+  }, [mounted])
+
   // Focus à chaque ouverture, y compris une réouverture pendant l'animation de sortie (toujours montée).
   // Après l'effet ci-dessus, qui a noté l'élément d'origine.
   const visible = mounted && open
@@ -116,7 +138,7 @@ export function BottomSheet({ open, onClose, title, children, footer, full = fal
   if (!mounted) return null
 
   return createPortal(
-    <div class="fixed inset-0 z-40 flex items-end justify-center md:items-center md:p-6">
+    <div ref={layer} class="fixed inset-x-0 top-0 z-40 flex h-full items-end justify-center md:items-center md:p-6">
       <div class="sheet-backdrop absolute inset-0" data-open={shown || undefined} onClick={onClose} aria-hidden="true" />
       <div
         ref={panel}
@@ -126,7 +148,7 @@ export function BottomSheet({ open, onClose, title, children, footer, full = fal
         tabIndex={-1}
         data-open={shown || undefined}
         class={`sheet-panel relative flex w-full flex-col rounded-t-sheet bg-surface shadow-card outline-none md:max-w-[440px] md:rounded-sheet ${
-          full ? 'h-[calc(100dvh-env(safe-area-inset-top)-12px)] md:h-[85dvh] md:max-w-[560px]' : 'max-h-[92dvh]'
+          full ? 'h-[calc(100%-env(safe-area-inset-top)-12px)] md:h-[85dvh] md:max-w-[560px]' : 'max-h-[92%]'
         }`}
       >
         <div
