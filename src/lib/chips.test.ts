@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PER_COLOR,
+  MAX_REBUY_COLORS,
   duplicateFixedValues,
+  isRebuyColor,
   MIN_SMALL_CHIPS,
   SMALL_CHIPS_ADVISED,
   TARGET_SMALL_CHIPS,
@@ -418,5 +420,70 @@ describe('valeurs imposées', () => {
   it('refuse deux valeurs imposées identiques', () => {
     expect(() => proposeChips(withFixed([150, 150, 100, 100], [25, 25]))).toThrow(RangeError)
     expect(duplicateFixedValues([{ fixedValue: 25 }, {}, { fixedValue: 25 }, { fixedValue: 5 }])).toEqual(new Set([25]))
+  })
+})
+
+describe('couleurs de recave', () => {
+  const FELIX = [94, 40, 46, 24, 22, 23, 23]
+  const PRINTED = [undefined, 5, 10, 25, 100, 1000, 500]
+  const felix = (maxPlayers: number, rebuysPerPlayer: number) =>
+    input(FELIX, { maxPlayers, rebuysPerPlayer, stock: stock(...FELIX).map((s, i) => (PRINTED[i] === undefined ? s : { ...s, fixedValue: PRINTED[i] })) })
+
+  it('Félix, 6 joueurs, 1 recave : stack 1-5-10-25, le noir à 100 sert seulement aux recaves', () => {
+    const { colors, summary } = proposal(felix(6, 1))
+    const used = colors.filter((c) => c.perPlayer > 0)
+    expect(used.map((c) => c.valuePoints)).toEqual([1, 5, 10, 25])
+    const rebuy = colors.filter(isRebuyColor)
+    expect(rebuy.map((c) => [c.name, c.valuePoints])).toEqual([['Noir', 100]])
+    expect(summary.issues).toEqual([])
+    expect(summary.stackPoints).toBe(200)
+    // 22 jetons à 100 en réserve : 11 recaves de 200 pts.
+    expect(summary.rebuysPossible).toBe(11)
+  })
+
+  it('aucune couleur de recave quand la réserve du stack suffit', () => {
+    for (const c of proposal(felix(6, 0)).colors) expect(isRebuyColor(c)).toBe(false)
+    for (const c of proposal(felix(8, 1)).colors) expect(isRebuyColor(c)).toBe(false)
+  })
+
+  it('une couleur de recave vaut plus que la plus grosse du stack et au plus le stack', () => {
+    for (const [players, rebuys] of [[4, 2], [5, 1], [5, 2], [6, 1]]) {
+      const { colors, summary } = proposal(felix(players!, rebuys!))
+      const top = Math.max(...colors.filter((c) => c.perPlayer > 0).map((c) => c.valuePoints))
+      const rebuy = colors.filter(isRebuyColor)
+      expect(rebuy.length).toBeGreaterThan(0)
+      expect(rebuy.length).toBeLessThanOrEqual(MAX_REBUY_COLORS)
+      for (const c of rebuy) {
+        expect(c.valuePoints).toBeGreaterThan(top)
+        expect(c.valuePoints).toBeLessThanOrEqual(summary.stackPoints)
+      }
+      expect(summary.rebuysPossible).toBeGreaterThanOrEqual(players! * rebuys!)
+    }
+  })
+
+  it('une couleur libre peut devenir une plaque à une valeur ronde', () => {
+    // Trois couleurs pour le stack, une quatrième peu nombreuse : la réserve du stack ne suffit pas.
+    const { colors, summary } = proposal(input([100, 60, 60, 40], { maxPlayers: 6, rebuysPerPlayer: 3 }))
+    const rebuy = colors.filter(isRebuyColor)
+    expect(rebuy.length).toBeGreaterThan(0)
+    for (const c of rebuy) expect([10, 25, 50, 100, 250, 500, 1000, 2500, 5000]).toContain(c.valuePoints)
+    expect(summary.rebuysPossible).toBeGreaterThanOrEqual(18)
+  })
+
+  it('summarizeChips : une couleur de recave compte toute sa quantité dans la réserve, et dans les doublons', () => {
+    const base: ChipColor[] = [
+      { id: 'w', name: 'Blanc', hex: '#fff', valuePoints: 1, perPlayer: 10, totalQty: 60 },
+      { id: 'r', name: 'Rouge', hex: '#f00', valuePoints: 5, perPlayer: 4, totalQty: 24 },
+      { id: 'g', name: 'Vert', hex: '#0f0', valuePoints: 10, perPlayer: 7, totalQty: 42 },
+      { id: 'b', name: 'Noir', hex: '#000', valuePoints: 100, perPlayer: 0, totalQty: 22 },
+    ]
+    const s = summarizeChips(base, 2000, 6)
+    expect(s.issues).toEqual([])
+    expect(s.stackPoints).toBe(100)
+    expect(s.colors.find((c) => c.id === 'b')!.reserve).toBe(22)
+    expect(s.rebuysPossible).toBe(22)
+    const dup = base.map((c) => (c.id === 'b' ? { ...c, valuePoints: 10 } : c))
+    expect(summarizeChips(dup, 2000, 6).issues).toContainEqual({ kind: 'duplicateValue', valuePoints: 10 })
+    expect(toChipConfig(base, 2000, 6).colors!.map((c) => c.id)).toEqual(['w', 'r', 'g', 'b'])
   })
 })

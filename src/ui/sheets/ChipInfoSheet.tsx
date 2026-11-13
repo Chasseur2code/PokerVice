@@ -31,7 +31,7 @@ export function ChipInfoSheet({ open, onClose }: { open: boolean; onClose: () =>
               <ChipDot hex={c.hex} size={24} />
               <div class="min-w-0 flex-1">
                 <p class="truncate font-semibold">{c.name}</p>
-                <p class="num text-[13px] text-text-muted">{c.perPlayer} par joueur au départ</p>
+                <p class="num text-[13px] text-text-muted">{c.perPlayer > 0 ? `${c.perPlayer} par joueur au départ` : 'pour les recaves seulement'}</p>
               </div>
               <div class="text-right">
                 <p class="num font-semibold">{fr.format(c.valuePoints)} pts</p>

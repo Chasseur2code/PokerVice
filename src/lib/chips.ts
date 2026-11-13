@@ -15,6 +15,8 @@
 //   - recaves à part : les plafonds ne portent que sur les stacks de départ (stock ÷ joueurs) ; la réserve
 //     des couleurs utilisées doit ensuite permettre de composer les recaves prévues, dans n'importe quelle
 //     composition (gros jetons d'abord), et non des stacks identiques au départ.
+// Si elle n'y suffit pas, une ou deux couleurs de recave (« plaques ») s'ajoutent : hors du stack de départ,
+// d'une valeur au-dessus de sa plus grosse et au plus égale au stack, elles ne servent qu'aux recaves.
 //
 // Valeurs imposées (`fixedValue`, ex. jetons imprimés) : si la couleur sert, c'est à cette valeur
 // (sinon elle reste en réserve) ; les couleurs libres comblent les trous (la plus nombreuse sur la plus petite valeur libre).
@@ -134,6 +136,9 @@ const EDGE_LIGHT_FROM = TARGET_SMALL_CHIPS
 const EDGE_HEAVY_FROM = 15
 /** Au-delà, une pile d'une seule couleur devient encombrante (même si le stock le permet). */
 export const MAX_PER_COLOR = 20
+/** Couleurs de recave ajoutées au plus, si la réserve du stack ne couvre pas les recaves prévues. */
+export const MAX_REBUY_COLORS = 2
+const W_REBUY_COLOR = 3 // par couleur de recave (une couleur de plus à expliquer à la table)
 
 type Sequence = { sb: number; units: number[] }
 const sequenceCache = new Map<string, readonly Sequence[]>()
@@ -213,12 +218,71 @@ function gcd(a: number, b: number): number {
   return a
 }
 
+/** Couleur de recave : une valeur, aucun jeton dans les stacks de départ. */
+interface RebuyColor {
+  stock: ChipStock
+  value: number
+}
+
 interface Solution {
   penalty: number
   /** Couleur de chaque valeur, par valeur croissante. */
   colors: ChipStock[]
+  /** En points. */
   values: number[]
   counts: number[]
+  rebuyColors: RebuyColor[]
+}
+
+/**
+ * Couleurs de recave à ajouter pour que la réserve couvre les recaves prévues : `[]` si celle du stack suffit,
+ * `null` si MAX_REBUY_COLORS couleurs n'y suffisent pas. Candidates : couleurs hors du stack, à leur valeur
+ * imposée ou à une valeur ronde, au-dessus de la plus grosse valeur du stack et au plus égale au stack (une
+ * « plaque » se casse en jouant, la table fait la monnaie). Préférence : moins de couleurs, puis valeurs plus
+ * petites (plus faciles à changer). `values` en points.
+ */
+function rebuyColorsFor(
+  input: ChipAssistantInput,
+  values: readonly number[],
+  counts: readonly number[],
+  colors: readonly ChipStock[],
+  unused: readonly ChipStock[],
+  forbidden: ReadonlySet<number>,
+): RebuyColor[] | null {
+  const needed = input.maxPlayers * input.rebuysPerPlayer
+  if (needed === 0) return []
+  const stack = values.reduce((s, v, i) => s + v * counts[i]!, 0)
+  const reserve = colors.map((c, i) => c.qty - input.maxPlayers * counts[i]!)
+  const covers = (extra: readonly RebuyColor[]) =>
+    rebuysFromReserve([...values, ...extra.map((e) => e.value)], [...reserve, ...extra.map((e) => e.stock.qty)], stack, needed) >= needed
+  if (covers([])) return []
+  const top = values[values.length - 1]!
+  const candidates: RebuyColor[] = []
+  for (const s of unused) {
+    if (s.fixedValue !== undefined) {
+      if (s.fixedValue > top && s.fixedValue <= stack) candidates.push({ stock: s, value: s.fixedValue })
+    } else {
+      for (const v of SERIES) if (v > top && v <= stack && !forbidden.has(v)) candidates.push({ stock: s, value: v })
+    }
+  }
+  candidates.sort((a, b) => a.value - b.value)
+  for (const c of candidates) if (covers([c])) return [c]
+  if (MAX_REBUY_COLORS < 2) return null
+  let best: RebuyColor[] | null = null
+  let bestKey = Infinity
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      const a = candidates[i]!
+      const b = candidates[j]!
+      if (a.stock === b.stock || a.value === b.value) continue
+      const key = b.value * 1e9 + a.value // plus grosse valeur d'abord, puis l'autre
+      if (key < bestKey && covers([a, b])) {
+        best = [a, b]
+        bestKey = key
+      }
+    }
+  }
+  return best
 }
 
 /**
@@ -294,11 +358,17 @@ function sortedStock(stock: readonly ChipStock[]): ChipStock[] {
 /**
  * Recherche de la meilleure répartition ; `firstOnly` s'arrête à la première trouvée (test de faisabilité).
  * `forbidden` : valeurs interdites aux couleurs libres (celles imposées à d'autres couleurs, même en réserve).
+ * `otherUnused` : couleurs hors de `input.stock` qui peuvent servir de couleur de recave (les imposées).
  */
-function search(input: ChipAssistantInput, firstOnly: boolean, forbidden: ReadonlySet<number> = new Set()): Solution | null {
+function search(
+  input: ChipAssistantInput,
+  firstOnly: boolean,
+  forbidden: ReadonlySet<number> = new Set(),
+  otherUnused: readonly ChipStock[] = [],
+): Solution | null {
   const sorted = sortedStock(input.stock)
   if (sorted.some((s) => s.fixedValue !== undefined)) return searchFixed(input, sorted, firstOnly)
-  // Plafonds : stacks de départ seulement ; les recaves sont vérifiées à part (reserveCovers).
+  // Plafonds : stacks de départ seulement ; les recaves sont vérifiées à part (rebuyColorsFor).
   const caps = sorted.map((s) => divFloor(s.qty, input.maxPlayers))
   const target = 2 * input.depthBB // stack en unités de SB
   let best: Solution | null = null
@@ -309,15 +379,37 @@ function search(input: ChipAssistantInput, firstOnly: boolean, forbidden: Readon
       if (forbidden.size > 0 && units.some((u) => forbidden.has(u * sb))) continue
       const r = bestComposition(units, caps.slice(0, k), target)
       if (!r) continue
-      if (!best || r.penalty < best.penalty - 1e-9) {
-        const colors = sorted.slice(0, k)
-        if (!reserveCovers(input, colors, units, r.counts)) continue
-        best = { penalty: r.penalty, colors, values: units.map((u) => u * sb), counts: r.counts }
+      const colors = sorted.slice(0, k)
+      const values = units.map((u) => u * sb)
+      const sol = withRebuyColors(input, r, colors, values, [...sorted.slice(k), ...otherUnused], forbidden, best)
+      if (sol) {
+        best = sol
         if (firstOnly) return best
       }
     }
   }
   return best
+}
+
+/**
+ * Solution complète (avec ses couleurs de recave) si elle bat `best`, sinon `null`. Les couleurs de recave
+ * ne sont cherchées qu'après comparaison de la note du stack seul (elles ne font que l'augmenter).
+ */
+function withRebuyColors(
+  input: ChipAssistantInput,
+  r: { penalty: number; counts: number[] },
+  colors: ChipStock[],
+  values: number[],
+  unused: readonly ChipStock[],
+  forbidden: ReadonlySet<number>,
+  best: Solution | null,
+): Solution | null {
+  const beats = (penalty: number) => !best || penalty < best.penalty - 1e-9
+  if (!beats(r.penalty)) return null
+  const rebuyColors = rebuyColorsFor(input, values, r.counts, colors, unused, forbidden)
+  if (!rebuyColors) return null
+  const penalty = r.penalty + W_REBUY_COLOR * rebuyColors.length
+  return beats(penalty) ? { penalty, colors, values, counts: r.counts, rebuyColors } : null
 }
 
 /**
@@ -338,11 +430,14 @@ function searchFixed(input: ChipAssistantInput, sorted: ChipStock[], firstOnly: 
     if (sol && (!best || sol.penalty < best.penalty - 1e-9)) best = sol
     return firstOnly && best !== null
   }
+  // Toute couleur imposée hors du stack peut servir de couleur de recave, même rare.
+  const fixedStock = sorted.filter((s) => s.fixedValue !== undefined)
   // Aucune couleur imposée utilisée : recherche ordinaire sur les couleurs libres.
-  if (consider(search({ ...input, stock: free }, firstOnly, forbidden))) return best
+  if (consider(search({ ...input, stock: free }, firstOnly, forbidden, fixedStock))) return best
   for (let mask = 1; mask < 1 << allFixed.length; mask++) {
     const fixed = allFixed.filter((_, i) => mask & (1 << i))
-    if (consider(searchWithFixed(input, fixed, free, cap, forbidden, firstOnly))) return best
+    const otherFixed = fixedStock.filter((s) => !fixed.includes(s))
+    if (consider(searchWithFixed(input, fixed, free, otherFixed, cap, forbidden, firstOnly))) return best
   }
   return best
 }
@@ -352,6 +447,7 @@ function searchWithFixed(
   input: ChipAssistantInput,
   fixed: ChipStock[],
   free: ChipStock[],
+  otherFixed: readonly ChipStock[],
   cap: (s: ChipStock) => number,
   forbidden: ReadonlySet<number>,
   firstOnly: boolean,
@@ -371,26 +467,14 @@ function searchWithFixed(
       if (units.reduce((s, u) => s + u, 0) > target) continue
       const r = bestComposition(units, colors.map(cap), target)
       if (!r) continue
-      if (!best || r.penalty < best.penalty - 1e-9) {
-        if (!reserveCovers(input, colors, units, r.counts)) continue
-        best = { penalty: r.penalty, colors, values, counts: r.counts }
+      const sol = withRebuyColors(input, r, colors, values, [...free.slice(j), ...otherFixed], forbidden, best)
+      if (sol) {
+        best = sol
         if (firstOnly) return best
       }
     }
   }
   return best
-}
-
-/**
- * La réserve des couleurs utilisées (stock − stacks de départ) permet-elle les recaves prévues,
- * chacune d'un stack, composée librement ? `values` en unités ou en points, du moment que c'est cohérent.
- */
-function reserveCovers(input: ChipAssistantInput, colors: readonly ChipStock[], values: readonly number[], counts: readonly number[]): boolean {
-  const needed = input.maxPlayers * input.rebuysPerPlayer
-  if (needed === 0) return true
-  const stack = values.reduce((s, v, i) => s + v * counts[i]!, 0)
-  const reserve = colors.map((c, i) => c.qty - input.maxPlayers * counts[i]!)
-  return rebuysFromReserve(values, reserve, stack, needed) >= needed
 }
 
 /**
@@ -455,7 +539,10 @@ export function proposeChips(input: ChipAssistantInput): ChipProposalResult {
   sol.colors.forEach((s, i) => {
     used.set(s.id, { id: s.id, name: s.name, hex: s.hex, valuePoints: sol.values[i]!, perPlayer: sol.counts[i]!, totalQty: s.qty })
   })
-  // Couleurs utilisées par valeur croissante, puis la réserve dans l'ordre de saisie.
+  for (const { stock: s, value } of sol.rebuyColors) {
+    used.set(s.id, { id: s.id, name: s.name, hex: s.hex, valuePoints: value, perPlayer: 0, totalQty: s.qty })
+  }
+  // Couleurs du stack par valeur croissante, couleurs de recave, puis la réserve dans l'ordre de saisie.
   const colors = [
     ...used.values(),
     ...input.stock
@@ -565,6 +652,7 @@ function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailur
 /**
  * Totaux d'une répartition, recalculés à chaque modification manuelle (SPEC §5.4).
  * Une couleur est utilisée si sa valeur et son nombre par joueur sont > 0 ; la SB est la plus petite valeur utilisée.
+ * Une couleur avec une valeur et 0 par joueur est une couleur de recave : toute sa quantité compte dans la réserve.
  */
 export function summarizeChips(colors: readonly ChipColor[], buyInCents: number, maxPlayers: number): ChipSummary {
   const issues: ChipIssue[] = []
@@ -576,10 +664,11 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
   for (const c of colors) if (!isValidColor(c)) issues.push({ kind: 'invalid', colorId: c.id })
   const used = colors.filter(isUsedColor)
   if (used.length === 0) issues.push({ kind: 'empty' })
+  const valued = colors.filter(hasValue)
 
   const seen = new Set<number>()
   const reported = new Set<number>()
-  for (const c of used) {
+  for (const c of valued) {
     if (seen.has(c.valuePoints) && !reported.has(c.valuePoints)) {
       issues.push({ kind: 'duplicateValue', valuePoints: c.valuePoints })
       reported.add(c.valuePoints)
@@ -604,7 +693,7 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
   const smallest = used.reduce<ChipColor | undefined>((a, c) => (!a || c.valuePoints < a.valuePoints ? c : a), undefined)
   const reserveOf = (c: ChipColor) => rows.find((r) => r.id === c.id)!.reserve
   const rebuysPossible =
-    issues.length > 0 ? 0 : rebuysFromReserve(used.map((c) => c.valuePoints), used.map(reserveOf), stackPoints, MAX_REBUYS_SHOWN)
+    issues.length > 0 ? 0 : rebuysFromReserve(valued.map((c) => c.valuePoints), valued.map(reserveOf), stackPoints, MAX_REBUYS_SHOWN)
   return {
     sbPoints,
     bbPoints,
@@ -629,10 +718,20 @@ function isValidColor(c: ChipColor): boolean {
 
 /** Une couleur est utilisée si elle est valide, avec une valeur et un nombre par joueur > 0. */
 function isUsedColor(c: ChipColor): boolean {
-  return isValidColor(c) && c.valuePoints > 0 && c.perPlayer > 0
+  return hasValue(c) && c.perPlayer > 0
 }
 
-/** Configuration jetons issue de l'assistant (après validation) ; seules les couleurs utilisées sont gardées. */
+/** Couleur du stack ou de recave : valide, avec une valeur > 0. */
+function hasValue(c: ChipColor): boolean {
+  return isValidColor(c) && c.valuePoints > 0
+}
+
+/** Couleur de recave : une valeur, mais aucun jeton dans les stacks de départ (une couleur en réserve n'a pas de valeur). */
+export function isRebuyColor(c: Pick<ChipColor, 'valuePoints' | 'perPlayer'>): boolean {
+  return c.valuePoints > 0 && c.perPlayer === 0
+}
+
+/** Configuration jetons issue de l'assistant (après validation) ; seules les couleurs avec une valeur (stack et recaves) sont gardées. */
 export function toChipConfig(colors: readonly ChipColor[], buyInCents: number, maxPlayers: number): ChipConfig {
   const s = summarizeChips(colors, buyInCents, maxPlayers)
   if (s.issues.length > 0 || !s.centsPerPoint) throw new RangeError('répartition invalide')
@@ -642,7 +741,7 @@ export function toChipConfig(colors: readonly ChipColor[], buyInCents: number, m
     bbPoints: s.bbPoints,
     sbPoints: s.sbPoints,
     colors: colors
-      .filter(isUsedColor)
+      .filter(hasValue)
       .sort((a, b) => a.valuePoints - b.valuePoints),
   }
 }

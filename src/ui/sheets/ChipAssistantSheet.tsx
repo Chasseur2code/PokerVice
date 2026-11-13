@@ -5,7 +5,7 @@
 import { X } from 'lucide-preact'
 import { useEffect, useId, useState } from 'preact/hooks'
 import { CHIP_KITS, CHIP_PALETTE, DEFAULT_CHIP_COLORS, nextChipColor, paletteEntry, type ChipKit } from '../../lib/chipColors'
-import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, MAX_REBUYS_SHOWN, SMALL_CHIPS_ADVISED, duplicateFixedValues, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
+import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, MAX_REBUYS_SHOWN, SMALL_CHIPS_ADVISED, duplicateFixedValues, isRebuyColor, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
 import { summarizePlayers } from '../../lib/derive'
 import { centsToInput, formatCents, parseEuros } from '../../lib/money'
 import { MAX_SEATED, MIN_PLAYERS_TO_START } from '../../lib/players'
@@ -380,6 +380,7 @@ function Proposal({ rows, setRows, colors, summary, buyInCents, running, onBack 
             const line = byId.get(r.id)
             const used = c.valuePoints > 0 && c.perPlayer > 0
             const euro = cpp && Number.isSafeInteger(c.valuePoints) && c.valuePoints > 0 ? formatEuroFraction(fraction(c.valuePoints * cpp.num, cpp.den)) : null
+            const forRebuys = isRebuyColor(c) && Number.isSafeInteger(c.valuePoints)
             return (
               <li key={r.id} class="flex items-center gap-2 py-2">
                 <ChipDot hex={r.hex} size={24} />
@@ -388,7 +389,9 @@ function Proposal({ rows, setRows, colors, summary, buyInCents, running, onBack 
                   <p class="num truncate text-[12px] text-text-muted">
                     {used
                       ? `${euro ? `${euro} · ` : ''}réserve ${fr.format(line?.reserve ?? 0)}`
-                      : `en réserve : ${plural(r.totalQty, 'jeton')}`}
+                      : forRebuys
+                        ? `${euro ? `${euro} · ` : ''}recaves seulement : ${plural(r.totalQty, 'jeton')}`
+                        : `en réserve : ${plural(r.totalQty, 'jeton')}`}
                   </p>
                 </div>
                 <CompactField

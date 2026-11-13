@@ -150,7 +150,8 @@ Option (interrupteur) pour empêcher la mise en veille du téléphone pendant la
 - Stack de départ par joueur = profondeur × BB, en points.
 - Contrainte de stock : pour chaque couleur, nb par joueur × nb max de joueurs ≤ quantité disponible (stacks de départ).
 - **Recaves à part** (idée reprise de [poker-chipper](https://github.com/jstrieb/poker-chipper)) : la réserve des couleurs utilisées doit permettre de composer nb max de joueurs × recaves attendues recaves d'un stack chacune, **dans n'importe quelle composition**, gros jetons d'abord (par exemple 2 jetons de 100 pour une recave de 200 pts). Une recave n'a pas à reproduire le stack de départ.
-- Une couleur peut rester entièrement en réserve, si c'est utile.
+- **Couleurs de recave** (« plaques ») : si la réserve des couleurs du stack ne suffit pas, l'assistant ajoute une couleur (deux au plus) **absente des stacks de départ**, qui ne sert qu'aux recaves. Sa valeur : la valeur imprimée, ou une valeur ronde, au-dessus de la plus grosse valeur du stack et au plus égale au stack ; la plus petite qui suffit (plus facile à changer). Elle a une valeur dans la config (bandeau, convertisseur), 0 jeton par joueur, et toute sa quantité compte dans la réserve. Exemple : mallette de Félix, 6 joueurs, 1 recave : stack 1-5-10-25, noirs à 100 pour les recaves.
+- Une couleur peut rester entièrement en réserve, sans valeur, si c'est utile.
 
 ### 5.3 Objectif : liquidité maximale
 L'algorithme cherche la répartition qui permet à **chaque joueur de miser n'importe quel montant et de rendre la monnaie** :
