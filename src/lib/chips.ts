@@ -446,7 +446,7 @@ function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailur
   if (s.maxPlayers !== undefined) fixes.push(`prévoir ${n(s.maxPlayers)} joueurs au plus`)
   if (s.rebuysPerPlayer !== undefined) fixes.push(`prévoir ${plural(s.rebuysPerPlayer, 'recave')} par joueur`)
   if (s.depthBB !== undefined) fixes.push(`descendre à ${s.depthBB} BB`)
-  if (b.kind === 'fixedValues') fixes.push('laisser libre ou changer une des valeurs imposées')
+  if (b.kind === 'fixedValues') fixes.push('remettre une valeur en « auto » ou en changer une')
   if (fixes.length === 0) return `${why} Ajouter des jetons ou des couleurs.`
   return `${why} Pour y arriver : ${fixes.join(', ou ')}.`
 }

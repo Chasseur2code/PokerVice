@@ -36,7 +36,7 @@ interface StockRow {
   name: string
   hex: string
   qty: string
-  /** Valeur imposée en points ; vide = libre. */
+  /** Valeur imposée en points ; vide ou « auto » = PokerVice choisit. */
   value: string
 }
 
@@ -94,9 +94,9 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
   const buyInCents = parseEuros(buyIn)
   const buyInValid = buyInCents !== null && buyInCents > 0
   const stockValid = stock.length >= MIN_STOCK && stock.every((r) => r.name.trim() !== '' && (parseCount(r.qty) ?? 0) > 0)
-  // Valeur imposée : vide (libre, `undefined`) ou entier de 1 à MAX_FIXED_VALUE, sans doublon ; `null` = invalide.
+  // Valeur imposée : vide ou « auto » (`undefined`) ou entier de 1 à MAX_FIXED_VALUE, sans doublon ; `null` = invalide.
   const fixedOf = (r: StockRow): number | undefined | null => {
-    if (r.value.trim() === '') return undefined
+    if (r.value.trim() === '' || r.value.trim().toLowerCase() === 'auto') return undefined
     const v = parseCount(r.value)
     return v !== null && v >= 1 && v <= MAX_FIXED_VALUE ? v : null
   }
@@ -284,7 +284,7 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
               {!stockValid && <p class="text-[13px] text-text-muted">Indiquez un nom et une quantité pour chaque couleur.</p>}
               {valuesValid ? (
                 <p class="text-[13px] text-text-muted">
-                  Sans valeur, PokerVice choisit la meilleure.
+                  Valeur en points imprimée sur vos jetons, s'il y en a une. En « auto », PokerVice choisit la meilleure.
                 </p>
               ) : (
                 <p class="text-[13px] text-loss">

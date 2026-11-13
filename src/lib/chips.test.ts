@@ -339,7 +339,7 @@ describe('valeurs imposées', () => {
     if (r.ok) return
     expect(r.failure.blocker).toEqual({ kind: 'fixedValues', values: [1, 1000] })
     expect(r.failure.message).toMatch(/valeurs imposées \(1, 1\s000 pts\)/)
-    expect(r.failure.message).toContain('laisser libre')
+    expect(r.failure.message).toContain('remettre une valeur en « auto »')
   })
 
   it('refuse deux valeurs imposées identiques', () => {
