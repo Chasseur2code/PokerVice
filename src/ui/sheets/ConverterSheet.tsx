@@ -6,15 +6,17 @@ import type { ChipConfig } from '../../lib/types'
 import {
   bbPointsForDepth,
   centsPerPointToInput,
-  centsToBB,
   centsToBBTenths,
   centsToPoints,
   converterConfig,
+  depthForBbPoints,
   formatEuroFraction,
   fraction,
   parseAmount,
-  parseCentsPerPoint,
+  parseBbPoints,
+  parseConverterPoint,
   parseCount,
+  parseDepth,
   pointsToBBTenths,
 } from '../../lib/units'
 import { gameStore, useGame } from '../../store/useGame'
@@ -30,7 +32,11 @@ const frTenths = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
 
 type CalcUnit = 'eur' | 'pts'
 
+const DEFAULT_POINT = '0,01'
 const DEFAULT_DEPTH = 100
+
+/** Texte du champ Profondeur : vide si elle n'est pas calculable ou arrondit à 0 (BB plus grosse que le demi-buy-in). */
+const depthText = (d: number | null) => (d ? String(d) : '')
 
 export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const cfg = useGame((s) => s.game.chipConfig)
@@ -50,27 +56,38 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
     if (cfg?.mode === 'converter') {
       setEuroPerPoint(centsPerPointToInput(cfg.centsPerPoint) ?? '')
       setBbPoints(String(cfg.bbPoints))
-      setDepth(String(centsToBB(buyIn, cfg)))
+      setDepth(depthText(depthForBbPoints(buyIn, cfg.centsPerPoint, cfg.bbPoints)))
     } else {
       // Proposition par défaut : 1 pt = 1 centime, 100 BB par buy-in.
-      setEuroPerPoint('0,01')
+      setEuroPerPoint(DEFAULT_POINT)
       setDepth(String(DEFAULT_DEPTH))
-      setBbPoints(String(bbPointsForDepth(buyIn, { num: 1, den: 1 }, DEFAULT_DEPTH)))
+      setBbPoints(String(bbPointsForDepth(buyIn, parseConverterPoint(DEFAULT_POINT)!, DEFAULT_DEPTH) ?? ''))
     }
     setCalcUnit('eur')
     setCalc('')
   }, [open])
 
   // Buy-in = profondeur × BB × valeur du point : la profondeur est l'intention, la BB s'en déduit.
-  // Changer la profondeur ou la valeur du point recalcule la BB ; changer la BB à la main recalcule la profondeur.
-  const syncBB = (eur: string, d: string) => {
-    const cpp = parseCentsPerPoint(eur)
-    const n = parseCount(d)
-    if (cpp && n) setBbPoints(String(bbPointsForDepth(buyIn, cpp, n)))
+  // Changer la profondeur recalcule la BB ; changer la BB à la main recalcule la profondeur. Changer la valeur
+  // du point recalcule la BB depuis la profondeur, ou la profondeur depuis la BB si la profondeur n'est pas valide
+  // (par exemple vidée parce que la BB a été saisie pendant que le champ € était invalide).
+  const syncBB = (cppInput: string, depthInput: string) => {
+    const cpp = parseConverterPoint(cppInput)
+    const d = parseDepth(depthInput)
+    if (!cpp || !d) return
+    const bb = bbPointsForDepth(buyIn, cpp, d)
+    if (bb !== null) setBbPoints(String(bb))
+  }
+  const syncDepth = (cppInput: string, bbInput: string) => {
+    const cpp = parseConverterPoint(cppInput)
+    const bb = parseBbPoints(bbInput)
+    // Sans valeur du point, la profondeur affichée ne correspondrait plus à la BB : on la vide.
+    if (bb) setDepth(cpp ? depthText(depthForBbPoints(buyIn, cpp, bb)) : '')
   }
   const onEuroPerPoint = (v: string) => {
     setEuroPerPoint(v)
-    syncBB(v, depth)
+    if (parseDepth(depth)) syncBB(v, depth)
+    else syncDepth(v, bbPoints)
   }
   const onDepth = (v: string) => {
     setDepth(v)
@@ -78,11 +95,11 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
   }
   const onBbPoints = (v: string) => {
     setBbPoints(v)
-    const c = converterConfig(euroPerPoint, v)
-    if (c) setDepth(String(centsToBB(buyIn, c)))
+    syncDepth(euroPerPoint, v)
   }
 
-  const draft: ChipConfig | null = locked ? cfg! : converterConfig(euroPerPoint, bbPoints)
+  const depthInvalid = depth.trim() !== '' && !parseDepth(depth)
+  const draft: ChipConfig | null = locked ? cfg! : depthInvalid ? null : converterConfig(euroPerPoint, bbPoints)
   const result = draft ? calcResult(calc, calcUnit, draft) : undefined
 
   const submit = (e: Event) => {
@@ -127,14 +144,14 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
         ) : (
           <>
             <div class="grid grid-cols-2 gap-3">
-              <CompactField label="1 point =" value={euroPerPoint} onInput={onEuroPerPoint} suffix="€" invalid={euroPerPoint.trim() !== '' && !parseCentsPerPoint(euroPerPoint)} />
+              <CompactField label="1 point =" value={euroPerPoint} onInput={onEuroPerPoint} suffix="€" invalid={euroPerPoint.trim() !== '' && !parseConverterPoint(euroPerPoint)} />
               <CompactField
                 label="Profondeur (buy-in)"
                 value={depth}
                 onInput={onDepth}
                 suffix="BB"
                 inputMode="numeric"
-                invalid={depth.trim() !== '' && !parseCount(depth)}
+                invalid={depthInvalid}
               />
               <CompactField
                 label="BB ="
@@ -142,7 +159,7 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
                 onInput={onBbPoints}
                 suffix="pts"
                 inputMode="numeric"
-                invalid={bbPoints.trim() !== '' && !parseCount(bbPoints)}
+                invalid={bbPoints.trim() !== '' && !parseBbPoints(bbPoints)}
               />
             </div>
             {draft && (
@@ -197,6 +214,16 @@ export function ConverterSheet({ open, onClose }: { open: boolean; onClose: () =
  */
 function calcResult(input: string, unit: CalcUnit, cfg: ChipConfig): string | null | undefined {
   if (input.trim() === '') return undefined
+  try {
+    return convert(input, unit, cfg)
+  } catch (e) {
+    // Montant si grand que les produits ne sont plus des entiers sûrs : traité comme invalide.
+    if (e instanceof RangeError) return null
+    throw e
+  }
+}
+
+function convert(input: string, unit: CalcUnit, cfg: ChipConfig): string | null {
   if (unit === 'eur') {
     const cents = parseAmount(input, 'eur', cfg)
     if (cents === null || cents < 0) return null

@@ -196,21 +196,57 @@ export function parseCount(input: string): number | null {
   return Number.isSafeInteger(n) ? n : null
 }
 
+// Bornes du convertisseur : avec elles, les produits des conversions (BB × numérateur, centimes × dénominateur × 10…)
+// restent des entiers sûrs pour tout buy-in réaliste.
+export const MAX_BB_POINTS = 1_000_000
+export const MAX_DEPTH_BB = 10_000
+const MAX_CENTS_PER_POINT_NUM = 1_000_000 // 1 point ≤ 10 000 €
+const MAX_CENTS_PER_POINT_DEN = 10_000 // 1 point ≥ 0,000001 €
+
+/** « 1 point = X € » du convertisseur : parseCentsPerPoint dans les bornes, sinon `null`. */
+export function parseConverterPoint(euroInput: string): Fraction | null {
+  const c = parseCentsPerPoint(euroInput)
+  return c && c.num <= MAX_CENTS_PER_POINT_NUM && c.den <= MAX_CENTS_PER_POINT_DEN ? c : null
+}
+
+/** BB en points (1 à MAX_BB_POINTS), sinon `null`. */
+export function parseBbPoints(input: string): number | null {
+  const n = parseCount(input)
+  return n && n <= MAX_BB_POINTS ? n : null
+}
+
+/** Profondeur en BB (1 à MAX_DEPTH_BB), sinon `null`. */
+export function parseDepth(input: string): number | null {
+  const n = parseCount(input)
+  return n && n <= MAX_DEPTH_BB ? n : null
+}
+
 /**
  * Configuration du convertisseur simple (SPEC §6) : « 1 point = X € » et « BB = Y points ».
- * La SB vaut la moitié de la BB (au moins 1 point). `null` si une saisie est invalide.
+ * La SB vaut la moitié de la BB (au moins 1 point). `null` si une saisie est invalide ou hors bornes.
  */
 export function converterConfig(euroPerPointInput: string, bbPointsInput: string): ChipConfig | null {
-  const centsPerPoint = parseCentsPerPoint(euroPerPointInput)
-  const bbPoints = parseCount(bbPointsInput)
+  const centsPerPoint = parseConverterPoint(euroPerPointInput)
+  const bbPoints = parseBbPoints(bbPointsInput)
   if (!centsPerPoint || !bbPoints) return null
   return { mode: 'converter', centsPerPoint, bbPoints, sbPoints: Math.max(1, divFloor(bbPoints, 2)) }
 }
 
+/** a / b arrondi au plus proche, ou `null` si un opérande n'est pas un entier sûr (grands produits). */
+function safeDivRound(a: number, b: number): number | null {
+  return Number.isSafeInteger(a) && Number.isSafeInteger(b) && b !== 0 ? divRound(a, b) : null
+}
+
 /**
  * BB en points pour qu'un buy-in fasse `depthBB` big blinds (convertisseur) : buy-in ÷ profondeur ÷ valeur du point,
- * arrondie au point le plus proche (au moins 1).
+ * arrondie au point le plus proche (au moins 1). `null` si le calcul déborde.
  */
-export function bbPointsForDepth(buyInCents: number, centsPerPoint: Fraction, depthBB: number): number {
-  return Math.max(1, divRound(buyInCents * centsPerPoint.den, centsPerPoint.num * depthBB))
+export function bbPointsForDepth(buyInCents: number, centsPerPoint: Fraction, depthBB: number): number | null {
+  const bb = safeDivRound(buyInCents * centsPerPoint.den, centsPerPoint.num * depthBB)
+  return bb === null ? null : Math.max(1, bb)
+}
+
+/** Profondeur (BB par buy-in, arrondie, peut valoir 0) pour une BB donnée : inverse de bbPointsForDepth. */
+export function depthForBbPoints(buyInCents: number, centsPerPoint: Fraction, bbPoints: number): number | null {
+  return safeDivRound(buyInCents * centsPerPoint.den, centsPerPoint.num * bbPoints)
 }

@@ -4,6 +4,10 @@ import {
   bbPointsForDepth,
   centsPerPointToInput,
   converterConfig,
+  depthForBbPoints,
+  parseBbPoints,
+  parseConverterPoint,
+  parseDepth,
   formatEuroFraction,
   parseCount,
   pointsToBBTenths,
@@ -170,6 +174,27 @@ describe('convertisseur simple', () => {
     expect(bbPointsForDepth(2000, { num: 1, den: 1 }, 150)).toBe(13) // 13,33 arrondi
     expect(bbPointsForDepth(2000, { num: 1, den: 5 }, 100)).toBe(100) // 1 pt = 0,002 €
     expect(bbPointsForDepth(100, { num: 100, den: 1 }, 200)).toBe(1) // jamais 0
+  })
+  it('déduit la profondeur de la BB (inverse)', () => {
+    expect(depthForBbPoints(2000, { num: 1, den: 1 }, 20)).toBe(100)
+    expect(depthForBbPoints(2000, { num: 1, den: 1 }, 5000)).toBe(0) // BB plus grosse que le demi-buy-in
+  })
+  it('renvoie null au lieu de lever si le calcul déborde', () => {
+    expect(bbPointsForDepth(2000, { num: 100_000, den: 1 }, 100_000_000_000)).toBeNull()
+    expect(depthForBbPoints(2000, { num: 100, den: 1 }, 999_999_999_999_999)).toBeNull()
+  })
+  it('borne les saisies du convertisseur', () => {
+    expect(parseConverterPoint('10000')).toEqual({ num: 1_000_000, den: 1 })
+    expect(parseConverterPoint('10000,01')).toBeNull()
+    expect(parseConverterPoint('0,000001')).toEqual({ num: 1, den: 10_000 })
+    expect(parseConverterPoint('0,0000001')).toBeNull()
+    expect(parseBbPoints('1000000')).toBe(1_000_000)
+    expect(parseBbPoints('1000001')).toBeNull()
+    expect(parseBbPoints('0')).toBeNull()
+    expect(parseDepth('10000')).toBe(10_000)
+    expect(parseDepth('10001')).toBeNull()
+    expect(parseDepth('0')).toBeNull()
+    expect(converterConfig('0,01', '999999999999999')).toBeNull()
   })
   it('lit un entier et convertit des points en BB', () => {
     expect(parseCount('2 350')).toBe(2350)
