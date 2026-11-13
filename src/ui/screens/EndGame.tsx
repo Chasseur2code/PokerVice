@@ -1,16 +1,16 @@
-// Fin de partie (SPEC §8.1-8.2, DESIGN §5) : saisie du stack final de chaque joueur assis, un écran
-// par joueur, avec « Reste à attribuer » ; puis, s'il y a un écart de comptage, Corriger, Répartir au
+// Fin de partie (SPEC §8.1-8.2, DESIGN §5) : saisie des stacks finaux de tous les joueurs assis sur une
+// seule page, avec « Reste à attribuer » ; puis, s'il y a un écart de comptage, Corriger, Répartir au
 // prorata ou Imputer à un joueur. Les stacks saisis restent locaux : rien n'est écrit dans le store
 // avant `finish`, qui clôt la partie et range le récap dans `lastRecap` (App bascule alors sur Recap).
-import { useId, useMemo, useState } from 'preact/hooks'
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 import { computeStats, summarizePlayers } from '../../lib/derive'
 import { discrepancyMessage, previewFinalBalances, type FinalStack } from '../../lib/discrepancy'
 import { amountToInput, formatAmount, formatEquivalent, parseAmountKeeping, type InputUnit } from '../../lib/units'
 import type { DiscrepancyResolution } from '../../lib/types'
 import { gameStore, useGame } from '../../store/useGame'
 import { PrimaryButton, SecondaryButton } from '../components/Button'
+import { CompactField } from '../components/CompactField'
 import { Header } from '../components/Header'
-import { NumberField } from '../components/NumberField'
 import { PlayerDot } from '../components/PlayerDot'
 import { Segmented, type SegmentedOption } from '../components/Segmented'
 import { showToast } from '../components/Toast'
@@ -23,6 +23,12 @@ const ENTRY_UNITS: readonly SegmentedOption<InputUnit>[] = [
 
 const SCREEN = 'mx-auto flex min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-w-md flex-col gap-3.5 px-4 pt-3 pb-5'
 
+/** Saisie d'un joueur : le texte du champ, et le montant exact dont il vient (après une bascule d'unité). */
+interface Entry {
+  value: string
+  preset: number | null
+}
+
 export function EndGame({ onCancel }: { onCancel: () => void }) {
   const game = useGame((s) => s.game)
   const unit = useGame((s) => s.unit)
@@ -31,6 +37,7 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
   // (sinon, la valeur d'un point est inconnue : tout en €). Choix local à cet écran.
   const [inputUnit, setInputUnit] = useState<InputUnit>(cfg ? 'pts' : 'eur')
   const formId = useId()
+  const form = useRef<HTMLFormElement>(null)
 
   const { seated, moneyInPlayCents } = useMemo(() => {
     const summaries = summarizePlayers(game)
@@ -41,21 +48,19 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
   }, [game])
   const n = seated.length
 
-  // Stack saisi par joueur assis (centimes), `null` tant qu'il n'est pas validé. `step === n` : vérification.
-  const [stacks, setStacks] = useState<(number | null)[]>(() => seated.map(() => null))
-  const [step, setStep] = useState(0)
-  const [value, setValue] = useState('')
+  const [entries, setEntries] = useState<Entry[]>(() => seated.map(() => ({ value: '', preset: null })))
+  // Personne d'assis (tous partis) : directement la vérification.
+  const [checking, setChecking] = useState(n === 0)
   const [assigning, setAssigning] = useState(false)
 
   const fmt = (cents: number) => formatAmount(cents, unit, cfg, { compact: true })
   const fmtInput = (cents: number) => formatAmount(cents, inputUnit, cfg, { compact: true })
 
-  const goTo = (i: number, list = stacks) => {
-    const known = list[i]
-    setValue(i < n && known != null ? amountToInput(known, inputUnit, cfg) : '')
-    setAssigning(false)
-    setStep(i)
-  }
+  // Stack de chaque joueur assis (centimes), `null` si le champ est vide ou invalide.
+  const stacks = entries.map((e) => {
+    const cents = parseAmountKeeping(e.value, inputUnit, cfg, e.preset)
+    return cents !== null && cents >= 0 ? cents : null
+  })
 
   const finalsOf = (list: (number | null)[]): FinalStack[] => seated.map((p, i) => ({ playerId: p.id, cents: list[i] ?? 0 }))
 
@@ -64,29 +69,42 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
     showUndoToast('Partie terminée')
   }
 
-  // ——— Saisie d'un stack ———
-  if (step < n) {
-    const player = seated[step]!
-    const cents = parseAmountKeeping(value, inputUnit, cfg, stacks[step] ?? null)
-    const valid = cents !== null && cents >= 0
-    let remaining = moneyInPlayCents - (valid ? cents : 0)
-    for (let i = 0; i < step; i++) remaining -= stacks[i] ?? 0
-    const last = step === n - 1
+  const fields = () => [...(form.current?.querySelectorAll('input') ?? [])]
+
+  // Focus sur le premier champ vide (clavier physique ; sur téléphone, le clavier attend un tap).
+  useEffect(() => {
+    if (!checking) fields()[stacks.findIndex((s) => s === null)]?.focus({ preventScroll: true })
+  }, [checking])
+
+  // ——— Saisie des stacks ———
+  if (!checking) {
+    const remaining = stacks.reduce<number>((r, s) => r - (s ?? 0), moneyInPlayCents)
+    const allValid = stacks.every((s) => s !== null)
+
+    // Entrée valide s'il ne manque rien ; sinon elle passe au prochain champ à remplir. Gérée à la main :
+    // le bouton par défaut du formulaire (Valider) est désactivé, ce qui bloque la soumission implicite.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || allValid) return
+      e.preventDefault()
+      const current = fields().indexOf(e.target as HTMLInputElement)
+      const next = stacks.findIndex((s, i) => i > current && s === null)
+      fields()[next >= 0 ? next : stacks.indexOf(null)]?.focus()
+    }
 
     const submit = (e: Event) => {
       e.preventDefault()
-      if (!valid) return
-      const next = stacks.map((s, i) => (i === step ? cents : s))
-      setStacks(next)
-      if (!last) return goTo(step + 1, next)
-      const finals = finalsOf(next)
-      if (previewFinalBalances(game, finals).discrepancyCents === 0) complete(finals)
-      else goTo(n, next)
+      if (!allValid) return
+      const finals = finalsOf(stacks)
+      if (previewFinalBalances(game, finals).discrepancyCents === 0) return complete(finals)
+      setAssigning(false)
+      setChecking(true)
     }
 
-    // Changer d'unité convertit la saisie en cours (les stacks déjà validés sont en centimes).
+    const update = (i: number, value: string) => setEntries((es) => es.map((e, j) => (j === i ? { ...e, value } : e)))
+
+    // Changer d'unité convertit toutes les saisies (le montant exact reste dans `preset`).
     const switchUnit = (u: InputUnit) => {
-      setValue(valid ? amountToInput(cents, u, cfg) : '')
+      setEntries(stacks.map((cents) => (cents === null ? { value: '', preset: null } : { value: amountToInput(cents, u, cfg), preset: cents })))
       setInputUnit(u)
     }
 
@@ -98,19 +116,7 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
           )}
         </Header>
 
-        <div class="flex flex-col gap-1.5" aria-label={`Joueur ${step + 1} sur ${n}`}>
-          <div class="flex items-baseline justify-between text-[13px] text-text-muted">
-            <span>Stacks finaux</span>
-            <span class="num font-semibold text-text">
-              {step + 1} / {n}
-            </span>
-          </div>
-          <div class="h-1.5 overflow-hidden rounded-full bg-surface-muted">
-            <div class="h-full rounded-full bg-accent transition-[width]" style={{ width: `${((step + 1) / n) * 100}%` }} />
-          </div>
-        </div>
-
-        <section class="rounded-card bg-surface px-4 py-3 text-center shadow-card">
+        <section class="sticky top-0 z-10 rounded-card bg-surface px-4 py-3 text-center shadow-card">
           <p class="text-caps font-semibold uppercase text-text-muted">Reste à attribuer</p>
           <p
             class={`num font-display text-hero font-bold ${remaining === 0 ? 'text-gain' : remaining < 0 ? 'text-loss' : ''}`}
@@ -120,28 +126,43 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
           </p>
         </section>
 
-        <form id={formId} onSubmit={submit} class="rounded-card bg-surface px-4 pt-3 pb-1 shadow-card">
-          <p class="flex items-center justify-center gap-2 font-display text-[20px] font-semibold">
-            <PlayerDot color={player.color} size={12} />
-            <span class="min-w-0 truncate">{player.name}</span>
-          </p>
-          <NumberField
-            key={step}
-            label="Stack final"
-            value={value}
-            onInput={setValue}
-            unit={inputUnit === 'pts' ? 'pts' : '€'}
-            equivalent={valid ? formatEquivalent(cents, inputUnit, cfg) : undefined}
-            error={value.trim() !== '' && !valid ? 'Montant invalide' : undefined}
-          />
+        <form ref={form} id={formId} onSubmit={submit} onKeyDown={onKeyDown} class="rounded-card bg-surface px-4 py-1 shadow-card">
+          <ul class="flex flex-col divide-y divide-border" aria-label="Stacks finaux">
+            {seated.map((player, i) => {
+              const { value } = entries[i]!
+              const cents = stacks[i] ?? null
+              const invalid = value.trim() !== '' && cents === null
+              const hint = invalid ? 'Montant invalide' : cents !== null ? formatEquivalent(cents, inputUnit, cfg) : undefined
+              return (
+                <li key={player.id} class="flex min-h-14 items-center gap-2.5 py-2">
+                  <PlayerDot color={player.color} />
+                  <div class="flex min-w-0 flex-1 flex-col">
+                    <span class="truncate font-semibold">{player.name}</span>
+                    {hint && <span class={`num truncate text-[13px] ${invalid ? 'text-loss' : 'text-text-muted'}`}>{hint}</span>}
+                  </div>
+                  <CompactField
+                    label={`Stack final de ${player.name}`}
+                    hideLabel
+                    value={value}
+                    onInput={(v) => update(i, v)}
+                    suffix={inputUnit === 'pts' ? 'pts' : '€'}
+                    placeholder="0"
+                    invalid={invalid}
+                    enterKeyHint={i === n - 1 ? 'done' : 'next'}
+                    class="w-32 shrink-0"
+                  />
+                </li>
+              )
+            })}
+          </ul>
         </form>
 
         <div class="mt-auto flex gap-2.5">
-          <SecondaryButton class="w-auto! shrink-0" onClick={() => (step === 0 ? onCancel() : goTo(step - 1))}>
-            {step === 0 ? 'Annuler' : 'Précédent'}
+          <SecondaryButton class="w-auto! shrink-0" onClick={onCancel}>
+            Annuler
           </SecondaryButton>
-          <PrimaryButton type="submit" form={formId} disabled={!valid} class="min-w-0">
-            {last ? 'Valider' : 'Suivant'}
+          <PrimaryButton type="submit" form={formId} disabled={!allValid} class="min-w-0">
+            Valider
           </PrimaryButton>
         </div>
       </main>
@@ -158,7 +179,7 @@ export function EndGame({ onCancel }: { onCancel: () => void }) {
     const stack = r.stacks.find((s) => s.playerId === p.id)
     return r.resolved && stack ? [{ player: p, stackCents: stack.cents, ok: stack.cents >= 0 }] : []
   })
-  const back = () => (n === 0 ? onCancel() : goTo(n - 1))
+  const back = () => (n === 0 ? onCancel() : setChecking(false))
 
   return (
     <main class={SCREEN}>

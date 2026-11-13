@@ -219,7 +219,7 @@ Bottom sheet en plein écran, avec une liste chronologique inversée :
 
 ### Fin de partie
 - **En-tête** : logo seul ; à droite, uniquement la bascule d'unité de saisie s'il existe une configuration jetons. Aucun libellé d'état (« Fin de partie », « Partie terminée ») sur cet écran ni sur le récap.
-- **Saisie des stacks** : un écran par joueur assis, avec une barre de progression (« 3 / 6 ») et le compteur **« Reste à attribuer »** en héros (Fraunces 34). Ce compteur passe en `--gain` quand il atteint 0, ou en `--loss` s'il devient négatif.
+- **Saisie des stacks** : une seule page, une ligne par joueur assis (pastille · nom · champ compact avec l'unité, équivalence ou erreur sous le nom), sous le compteur collé en haut **« Reste à attribuer »** en héros (Fraunces 34). Ce compteur passe en `--gain` quand il atteint 0, ou en `--loss` s'il devient négatif.
 - **Écart de comptage** : une carte affiche le message (« Il manque 140 points (1,40 €) ») et trois boutons empilés : Corriger, Répartir au prorata, Imputer à…
 
 ### Récap

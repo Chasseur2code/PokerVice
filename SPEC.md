@@ -214,8 +214,8 @@ Il est consultable **pendant la partie** (dans un panneau) et **dans le récap f
 
 ### 8.1 Saisie des stacks finaux
 - « Terminer la partie » demande une **confirmation**. La même confirmation propose aussi **« Abandonner la partie (sans récap) »** : retour à une table vide, sans saisie des stacks ni récap (annulable 5 s).
-- L'app passe joueur par joueur (les joueurs assis), avec la saisie du stack final en € ou en points : une bascule € | Pts propre à cet écran, sur **Pts par défaut** s'il existe une configuration jetons (sinon tout en €).
-- Un compteur **« Reste à attribuer »** part de l'argent total en jeu et diminue jusqu'à 0.
+- Une seule page liste tous les joueurs assis, chacun avec son champ de stack final (à remplir dans n'importe quel ordre ; Entrée passe au prochain champ vide), en € ou en points : une bascule € | Pts propre à cet écran, sur **Pts par défaut** s'il existe une configuration jetons (sinon tout en €).
+- Un compteur **« Reste à attribuer »** part de l'argent total en jeu et diminue jusqu'à 0. « Valider » s'active quand tous les stacks sont saisis.
 
 ### 8.2 Écart de comptage
 Si la somme des stacks finaux ne correspond pas à l'argent total en jeu :

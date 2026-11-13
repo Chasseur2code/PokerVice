@@ -14,6 +14,8 @@ export interface CompactFieldProps {
   inputMode?: 'decimal' | 'numeric' | 'text'
   invalid?: boolean
   placeholder?: string
+  /** Touche Entrée du clavier virtuel : « next » dans une suite de champs. */
+  enterKeyHint?: 'done' | 'next'
   class?: string
 }
 
@@ -26,6 +28,7 @@ export function CompactField({
   inputMode = 'decimal',
   invalid = false,
   placeholder,
+  enterKeyHint = 'done',
   class: cls = '',
 }: CompactFieldProps) {
   const id = useId()
@@ -44,7 +47,7 @@ export function CompactField({
           type="text"
           inputMode={inputMode}
           autoComplete="off"
-          enterKeyHint="done"
+          enterKeyHint={enterKeyHint}
           value={value}
           placeholder={placeholder}
           aria-invalid={invalid || undefined}

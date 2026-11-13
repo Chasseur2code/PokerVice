@@ -46,9 +46,10 @@ test('partie complète en € : recave, départ, rechargement, fin, récap et vi
   // Fin de partie : Alice 29, Bruno 7 → Alice +9, Bruno -3, Chloé -6.
   await page.getByRole('button', { name: 'Terminer la partie' }).click()
   await sheet(page).getByRole('button', { name: 'Compter les stacks' }).click()
-  await page.getByLabel('Stack final').fill('29')
-  await page.getByRole('button', { name: 'Suivant' }).click()
-  await page.getByLabel('Stack final').fill('7')
+  // Une seule page : un champ par joueur assis (Chloé, partie, n'en a pas).
+  await expect(page.getByLabel(/^Stack final de/)).toHaveCount(2)
+  await page.getByLabel('Stack final de Alice').fill('29')
+  await page.getByLabel('Stack final de Bruno').fill('7')
   // Comptes justes : pas d'étape de vérification, on arrive directement au récap.
   await page.getByRole('button', { name: 'Valider' }).click()
 
@@ -113,14 +114,40 @@ test('avec une config jetons, les stacks finaux se saisissent en points par déf
   await expect(page.getByRole('button', { name: 'Points' })).toHaveAttribute('aria-pressed', 'true')
   const remaining = page.locator('section').filter({ hasText: 'Reste à attribuer' })
   await expect(remaining).toContainText(/2\s000\spts/)
-  await page.getByLabel('Stack final').fill('1500')
-  await page.getByRole('button', { name: 'Suivant' }).click()
-  // Bascule en € pour le second : il reste 5 € (500 pts).
+  await page.getByLabel('Stack final de Alice').fill('1500')
+  // Bascule en € : la saisie d'Alice est convertie, il reste 5 € (500 pts).
   await page.getByRole('button', { name: 'Euros' }).click()
+  await expect(page.getByLabel('Stack final de Alice')).toHaveValue('15')
   await expect(remaining).toContainText(/5\s€/)
-  await page.getByLabel('Stack final').fill('5')
+  await page.getByLabel('Stack final de Bruno').fill('5')
   await page.getByRole('button', { name: 'Valider' }).click()
   await expect(page.locator('main')).toContainText(/Bruno\s*→\s*Alice\s*5(,00)?\s€/)
+})
+
+test('fin de partie : Entrée passe au champ vide suivant, « Corriger » garde les saisies', async ({ page }) => {
+  for (const name of ['Alice', 'Bruno', 'Chloé']) await addPlayer(page, name)
+  await page.getByRole('button', { name: 'Démarrer la partie' }).click()
+  await page.getByRole('button', { name: 'Terminer la partie' }).click()
+  await sheet(page).getByRole('button', { name: 'Compter les stacks' }).click()
+
+  const field = (name: string) => page.getByLabel(`Stack final de ${name}`)
+  await expect(field('Alice')).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Valider' })).toBeDisabled()
+  await page.keyboard.type('12')
+  await page.keyboard.press('Enter')
+  await expect(field('Bruno')).toBeFocused()
+  await page.keyboard.type('8')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('9') // 29 € pour 30 en jeu
+  await page.keyboard.press('Enter')
+  await expect(page.locator('main')).toContainText(/Il manque 1(,00)?\s€/)
+
+  await page.getByRole('button', { name: 'Corriger' }).click()
+  await expect(field('Alice')).toHaveValue('12')
+  await expect(field('Chloé')).toHaveValue('9')
+  await field('Chloé').fill('10')
+  await page.getByRole('button', { name: 'Valider' }).click()
+  await expect(page.locator('main')).toContainText(/Bruno\s*→\s*Alice\s*2(,00)?\s€/)
 })
 
 test('« Mallette de Félix » remplit les couleurs, et l’assistant laisse les grosses valeurs en réserve', async ({ page }) => {
