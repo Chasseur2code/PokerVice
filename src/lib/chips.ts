@@ -55,8 +55,10 @@ export interface ChipSummary {
   /** 1 point = buy-in ÷ stack ; `null` si le stack est vide. */
   centsPerPoint: Fraction | null
   chipsPerPlayer: number
-  /** Jetons de la plus petite valeur dans chaque stack (sous SMALL_CHIPS_ADVISED : avertissement, pas une erreur). */
+  /** Jetons de la plus petite valeur dans chaque stack (sous `smallChipsAdvised` : avertissement, pas une erreur). */
   smallChipsPerPlayer: number
+  /** Nombre conseillé, selon le rapport avec la couleur suivante du stack (smallChipThresholds) ; 0 sans couleur suivante. */
+  smallChipsAdvised: number
   /** Une ligne par couleur, dans l'ordre reçu. */
   colors: { id: string; reserve: number }[]
   /** Recaves (d'un stack chacune, gros jetons d'abord) que la réserve permet pour toute la table, au plus MAX_REBUYS_SHOWN. */
@@ -97,13 +99,20 @@ export type ChipProposalResult =
 
 /** Couleurs utilisées au minimum (SPEC : 4 à 7 saisies, dont certaines peuvent rester en réserve). */
 export const MIN_COLORS_USED = 3
+/** Plancher absolu des jetons de SB par joueur, quel que soit le rapport avec la couleur suivante. */
+export const MIN_SMALL_CHIPS = 3
+
 /**
- * Jetons de SB par joueur : plancher dur MIN_SMALL_CHIPS ; sous SMALL_CHIPS_ADVISED, forte pénalité
- * (et avertissement dans le résultat) ; sous TARGET_SMALL_CHIPS, pénalité légère.
+ * Seuils des jetons de SB par joueur, selon le rapport r avec la couleur suivante : r − 1 jetons composent
+ * tout montant sous un jeton suivant, plus une marge pour les blinds (la SB = 1 jeton ; si r = 2, la BB est
+ * un seul jeton suivant). `min` : plancher dur ; sous `advised`, forte pénalité et avertissement dans le
+ * résultat ; sous `target`, pénalité légère. r = 5 : 5 / 8 / 10 ; r = 2 : 3 / 5 / 5.
  */
-export const MIN_SMALL_CHIPS = 5
-export const SMALL_CHIPS_ADVISED = 8
-export const TARGET_SMALL_CHIPS = 10
+export function smallChipThresholds(r: number): { min: number; advised: number; target: number } {
+  const ceil = Math.ceil(r - 1e-9)
+  const advised = ceil + 3
+  return { min: Math.max(MIN_SMALL_CHIPS, ceil), advised, target: Math.max(Math.ceil(2 * r - 1e-9), advised) }
+}
 /** Au-delà, « La réserve permet N recaves » n'a plus d'intérêt (et le calcul s'arrête). */
 export const MAX_REBUYS_SHOWN = 99
 export const DEPTH_MIN = 50
@@ -120,8 +129,8 @@ const SB_CANDIDATES = [1, 2, 5, 10, 25, 50, 100]
 
 // Poids de la pénalité (plus bas = mieux). Valeurs réglées sur des mallettes de 300 et 500 jetons.
 const W_CHIP = 1 // chaque jeton dans le stack (un stack énorme est peu pratique)
-const W_SMALL_MISSING = 12 // par petit jeton manquant sous TARGET_SMALL_CHIPS
-const W_SMALL_SCARCE = 30 // en plus, par petit jeton manquant sous SMALL_CHIPS_ADVISED (contrainte souple)
+const W_SMALL_MISSING = 12 // par petit jeton manquant sous la cible (smallChipThresholds)
+const W_SMALL_SCARCE = 30 // en plus, par petit jeton manquant sous le nombre conseillé (contrainte souple)
 const W_SMALL_BONUS = 0.6 // par petit jeton jusqu'à la fin de sa zone libre (liquidité)
 const W_CHANGE = 4 // par « monnaie » manquante (on vise 2 jetons changés avec la couleur juste en dessous)
 const W_BIG = 25 // part du stack × log2(valeur) : peu de valeur dans les gros jetons
@@ -132,7 +141,7 @@ const W_BIG = 25 // part du stack × log2(valeur) : peu de valeur dans les gros 
 // au-dessus : elle porte la valeur en quelques jetons, zone fixe EDGE_LIGHT_FROM / EDGE_HEAVY_FROM.
 const W_OVER_2R = 2 // par jeton au-delà de 2r
 const W_OVER_3R = 15 // en plus, par jeton au-delà de 3r
-const EDGE_LIGHT_FROM = TARGET_SMALL_CHIPS
+const EDGE_LIGHT_FROM = 10
 const EDGE_HEAVY_FROM = 15
 /** Au-delà, une pile d'une seule couleur devient encombrante (même si le stock le permet). */
 export const MAX_PER_COLOR = 20
@@ -300,9 +309,10 @@ function bestComposition(units: number[], caps: number[], target: number): { pen
     const next = new Float64Array(target + 1).fill(Infinity)
     const pick = new Int32Array(target + 1)
     const maxC = Math.min(caps[i]!, MAX_PER_COLOR, Math.floor(target / w))
-    const minC = i === 0 ? MIN_SMALL_CHIPS : 1
     // Zone libre jusqu'à `light`, pénalité légère jusqu'à `heavy`, forte au-delà (r = 0 : plus grosse couleur).
     const r = i + 1 < k ? units[i + 1]! / w : 0
+    const small = smallChipThresholds(r) // utilisé pour i = 0 seulement (k ≥ 3, donc r > 0)
+    const minC = i === 0 ? small.min : 1
     const edge = i === 0 || r === 0
     const light = edge ? Math.max(2 * r, EDGE_LIGHT_FROM) : 2 * r
     const heavy = edge ? Math.max(3 * r, EDGE_HEAVY_FROM) : 3 * r
@@ -311,8 +321,8 @@ function bestComposition(units: number[], caps: number[], target: number): { pen
     for (let c = minC; c <= maxC; c++) {
       let p = W_CHIP * c + (W_BIG * c * w * logs[i]!) / target
       if (i === 0) {
-        p += W_SMALL_MISSING * Math.max(0, TARGET_SMALL_CHIPS - c) - W_SMALL_BONUS * Math.min(c, light)
-        p += W_SMALL_SCARCE * Math.max(0, SMALL_CHIPS_ADVISED - c)
+        p += W_SMALL_MISSING * Math.max(0, small.target - c) - W_SMALL_BONUS * Math.min(c, light)
+        p += W_SMALL_SCARCE * Math.max(0, small.advised - c)
       }
       if (i + 1 < k) p += W_CHANGE * Math.max(0, 2 - (c * w) / units[i + 1]!)
       p += W_OVER_2R * Math.max(0, c - light) + W_OVER_3R * Math.max(0, c - heavy)
@@ -691,6 +701,8 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
   const sizeOk = Number.isSafeInteger(stackPoints * 10)
   if (!sizeOk) issues.push({ kind: 'tooLarge' })
   const smallest = used.reduce<ChipColor | undefined>((a, c) => (!a || c.valuePoints < a.valuePoints ? c : a), undefined)
+  const nextValue = Math.min(...used.filter((c) => c.valuePoints > sbPoints).map((c) => c.valuePoints))
+  const smallChipsAdvised = Number.isFinite(nextValue) ? smallChipThresholds(nextValue / sbPoints).advised : 0
   const reserveOf = (c: ChipColor) => rows.find((r) => r.id === c.id)!.reserve
   const rebuysPossible =
     issues.length > 0 ? 0 : rebuysFromReserve(valued.map((c) => c.valuePoints), valued.map(reserveOf), stackPoints, MAX_REBUYS_SHOWN)
@@ -703,6 +715,7 @@ export function summarizeChips(colors: readonly ChipColor[], buyInCents: number,
     centsPerPoint: stackPoints > 0 && sizeOk && settingsOk ? fraction(buyInCents, stackPoints) : null,
     chipsPerPlayer: used.reduce((s, c) => s + c.perPlayer, 0),
     smallChipsPerPlayer: smallest?.perPlayer ?? 0,
+    smallChipsAdvised,
     colors: rows,
     rebuysPossible,
     issues,

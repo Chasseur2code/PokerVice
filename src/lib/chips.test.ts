@@ -5,8 +5,7 @@ import {
   duplicateFixedValues,
   isRebuyColor,
   MIN_SMALL_CHIPS,
-  SMALL_CHIPS_ADVISED,
-  TARGET_SMALL_CHIPS,
+  smallChipThresholds,
   rebuysFromReserve,
   proposeChips,
   summarizeChips,
@@ -67,7 +66,7 @@ function expectValid(inp: ChipAssistantInput) {
     expect(c.perPlayer).toBeLessThanOrEqual(MAX_PER_COLOR)
   }
   // Mallettes réalistes : la contrainte souple des petits jetons est respectée.
-  expect(used[0]!.perPlayer).toBeGreaterThanOrEqual(SMALL_CHIPS_ADVISED)
+  expect(used[0]!.perPlayer).toBeGreaterThanOrEqual(summary.smallChipsAdvised)
   expect(summary.smallChipsPerPlayer).toBe(used[0]!.perPlayer)
   expect(summary.rebuysPossible).toBeGreaterThanOrEqual(inp.maxPlayers * inp.rebuysPerPlayer)
   return { colors, used, summary }
@@ -87,7 +86,7 @@ describe('proposeChips — cas réalistes à 100 BB (critère 6)', () => {
 
   it('mallette de 500 : une répartition liquide (≥ 10 petits jetons, plus grosse valeur ≤ 10 BB)', () => {
     const { used, summary } = expectValid(input([150, 150, 100, 50, 50]))
-    expect(used[0]!.perPlayer).toBeGreaterThanOrEqual(TARGET_SMALL_CHIPS)
+    expect(used[0]!.perPlayer).toBeGreaterThanOrEqual(smallChipThresholds(used[1]!.valuePoints / used[0]!.valuePoints).target)
     expect(used[used.length - 1]!.valuePoints).toBeLessThanOrEqual(10 * summary.bbPoints)
   })
 
@@ -134,31 +133,35 @@ describe('proposeChips — cas réalistes à 100 BB (critère 6)', () => {
 })
 
 describe('proposeChips — cas impossibles', () => {
-  it('trop peu de petits jetons, même sous le plancher dur de 5 : explique et propose ce qui marche', () => {
-    const inp = input([40, 40, 40, 40], { maxPlayers: 10 })
+  it('trop peu de petits jetons, même sous le plancher absolu de 3 : explique et propose ce qui marche', () => {
+    const inp = input([25, 25, 25, 25], { maxPlayers: 10 })
     const r = proposeChips(inp)
     expect(r.ok).toBe(false)
     if (r.ok) return
-    expect(r.failure.blocker).toEqual({ kind: 'smallChips', colorName: 'Blanc', needed: 50, available: 40 })
-    expect(r.failure.suggestions).toEqual({ maxPlayers: 8 })
+    expect(r.failure.blocker).toEqual({ kind: 'smallChips', colorName: 'Blanc', needed: 30, available: 25 })
+    expect(r.failure.suggestions).toEqual({ maxPlayers: 6 })
     expect(r.failure.message).toBe(
-      'Pas assez de petits jetons Blanc : pour en donner au moins 5 à chacun, il en faut 50 (10 joueurs), il y en a 40. ' +
-        'Pour y arriver : prévoir 8 joueurs au plus.',
+      'Pas assez de petits jetons Blanc : pour en donner au moins 3 à chacun, il en faut 30 (10 joueurs), il y en a 25. ' +
+        'Pour y arriver : prévoir 6 joueurs au plus.',
     )
-    // La suggestion donne une répartition, avec moins de petits jetons que conseillé (contrainte souple).
-    const ok = proposal({ ...inp, maxPlayers: 8 })
-    expect(ok.summary.issues).toEqual([])
-    expect(ok.summary.smallChipsPerPlayer).toBe(5)
+    expect(proposal({ ...inp, maxPlayers: 6 }).summary.issues).toEqual([])
   })
 
-  it('contrainte souple : sous 8 petits jetons seulement si la mallette ne permet pas mieux', () => {
-    // Couleur la plus nombreuse = petits jetons. 94 pour 10 joueurs : 8 ou 9 chacun ; 70 : 7 au plus (avertissement, pas d'erreur).
+  it('seuils des petits jetons selon le rapport r avec la couleur suivante', () => {
+    expect(smallChipThresholds(5)).toEqual({ min: 5, advised: 8, target: 10 })
+    expect(smallChipThresholds(2)).toEqual({ min: 3, advised: 5, target: 5 })
+    expect(smallChipThresholds(2.5)).toEqual({ min: 3, advised: 6, target: 6 })
+    expect(smallChipThresholds(4)).toEqual({ min: 4, advised: 7, target: 8 })
+  })
+
+  it('contrainte souple : sous le nombre conseillé seulement si la mallette ne permet pas mieux', () => {
     const { summary } = proposal(input([94, 90, 90, 90], { maxPlayers: 10, rebuysPerPlayer: 0 }))
-    expect(summary.smallChipsPerPlayer).toBeGreaterThanOrEqual(SMALL_CHIPS_ADVISED)
-    const scarce = proposal(input([70, 60, 60, 60], { maxPlayers: 10, rebuysPerPlayer: 0 }))
+    expect(summary.smallChipsPerPlayer).toBeGreaterThanOrEqual(summary.smallChipsAdvised)
+    // 40 jetons par couleur pour 10 joueurs : 4 chacun au plus (avertissement, pas d'erreur).
+    const scarce = proposal(input([40, 40, 40, 40], { maxPlayers: 10 }))
     // Proposée quand même (plus d'échec), entre le plancher dur et le conseillé ; le résultat l'affiche.
     expect(scarce.summary.smallChipsPerPlayer).toBeGreaterThanOrEqual(MIN_SMALL_CHIPS)
-    expect(scarce.summary.smallChipsPerPlayer).toBeLessThan(SMALL_CHIPS_ADVISED)
+    expect(scarce.summary.smallChipsPerPlayer).toBeLessThan(scarce.summary.smallChipsAdvised)
     expect(scarce.summary.issues).toEqual([])
   })
 
@@ -439,6 +442,15 @@ describe('couleurs de recave', () => {
     expect(summary.stackPoints).toBe(200)
     // 22 jetons à 100 en réserve : 11 recaves de 200 pts.
     expect(summary.rebuysPossible).toBe(11)
+  })
+
+  it('Félix, 10 joueurs, 1 recave : SB à 5 (rapport 2 avec le 10), jaune à 1 000 = une recave', () => {
+    const { colors, summary } = proposal(felix(10, 1))
+    expect(summary.sbPoints).toBe(5)
+    expect(summary.smallChipsAdvised).toBe(5)
+    expect(colors.filter(isRebuyColor).map((c) => [c.id, c.valuePoints])).toEqual([['c5', 1000]]) // jaune
+    expect(summary.rebuysPossible).toBeGreaterThanOrEqual(10)
+    expect(summary.issues).toEqual([])
   })
 
   it('aucune couleur de recave quand la réserve du stack suffit', () => {

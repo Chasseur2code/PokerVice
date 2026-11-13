@@ -5,7 +5,7 @@
 import { X } from 'lucide-preact'
 import { useEffect, useId, useState } from 'preact/hooks'
 import { CHIP_KITS, CHIP_PALETTE, DEFAULT_CHIP_COLORS, nextChipColor, paletteEntry, type ChipKit } from '../../lib/chipColors'
-import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, MAX_REBUYS_SHOWN, SMALL_CHIPS_ADVISED, duplicateFixedValues, isRebuyColor, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
+import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, MAX_REBUYS_SHOWN, duplicateFixedValues, isRebuyColor, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
 import { summarizePlayers } from '../../lib/derive'
 import { centsToInput, formatCents, parseEuros } from '../../lib/money'
 import { MAX_SEATED, MIN_PLAYERS_TO_START } from '../../lib/players'
@@ -426,9 +426,9 @@ function Proposal({ rows, setRows, colors, summary, buyInCents, running, onBack 
         </ul>
       ) : (
         <div class="flex flex-col gap-1">
-          {summary.smallChipsPerPlayer < SMALL_CHIPS_ADVISED && (
+          {summary.smallChipsPerPlayer < summary.smallChipsAdvised && (
             <p class="num text-body text-accent-text">
-              Seulement {summary.smallChipsPerPlayer} petits jetons par joueur ({SMALL_CHIPS_ADVISED} conseillés) : la mallette n'en a pas
+              Seulement {summary.smallChipsPerPlayer} petits jetons par joueur ({summary.smallChipsAdvised} conseillés) : la mallette n'en a pas
               assez pour mieux faire.
             </p>
           )}

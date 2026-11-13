@@ -155,7 +155,7 @@ Option (interrupteur) pour empêcher la mise en veille du téléphone pendant la
 
 ### 5.3 Objectif : liquidité maximale
 L'algorithme cherche la répartition qui permet à **chaque joueur de miser n'importe quel montant et de rendre la monnaie** :
-- assez de jetons de la plus petite valeur par joueur pour payer les blinds plusieurs fois et faire l'appoint (ordre de grandeur : au moins 10). **Contrainte souple** : 8 conseillés, 5 au minimum ; entre les deux, la répartition est proposée avec un avertissement plutôt que refusée ;
+- assez de jetons de la plus petite valeur par joueur pour payer les blinds plusieurs fois et faire l'appoint. Le besoin dépend du rapport r avec la couleur suivante (r − 1 jetons composent tout montant inférieur, plus une marge pour les blinds) : **conseillé r + 3, minimum r (3 au moins), cible 2r**. Soit 8 conseillés et 5 au minimum pour r = 5, et 5 conseillés et 3 au minimum pour r = 2. **Contrainte souple** : entre le minimum et le conseillé, la répartition est proposée avec un avertissement plutôt que refusée ;
 - un écart raisonnable entre deux valeurs successives (rapport de 2 à 5, idéalement) ;
 - pour chaque valeur, assez de jetons de la valeur inférieure pour faire la monnaie ;
 - le moins possible de jetons de forte valeur dans le stack de départ ;
