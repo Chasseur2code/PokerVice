@@ -8,6 +8,12 @@
 //   - pour chaque suite, une programmation dynamique sur le montant cumulé trouve la composition
 //     exacte du stack qui minimise une pénalité séparable couleur par couleur.
 // Tout est calculé en « unités » = multiples de la SB, puis converti en points.
+//
+// Valeurs imposées (`fixedValue`, ex. jetons imprimés) : la couleur est forcément utilisée, à cette
+// valeur ; les couleurs libres comblent les trous (la plus nombreuse sur la plus petite valeur libre).
+// Entre deux valeurs libres, la règle reste « multiple, rapport 2 à 5 » ; à côté d'une valeur imposée,
+// seulement « rapport 2 à 5 » (5-10-25 est courant), et deux valeurs imposées doivent juste croître.
+// L'unité de calcul est alors le PGCD des valeurs.
 import { divFloor, divRound } from './money'
 import { fraction } from './units'
 import type { ChipColor, ChipConfig, Fraction } from './types'
@@ -18,6 +24,8 @@ export interface ChipStock {
   name: string
   hex: string
   qty: number
+  /** Valeur imposée en points ; absente = l'assistant la choisit. */
+  fixedValue?: number
 }
 
 export interface ChipAssistantInput {
@@ -59,6 +67,8 @@ export type ChipBlocker =
   | { kind: 'tooFewColors' }
   | { kind: 'stock'; colorName: string; needed: number; available: number }
   | { kind: 'smallChips'; colorName: string; needed: number; available: number }
+  /** Possible sans les valeurs imposées, mais pas avec. */
+  | { kind: 'fixedValues'; values: number[] }
   | { kind: 'composition' }
 
 export interface ChipFailure {
@@ -79,6 +89,8 @@ export const MIN_SMALL_CHIPS = 8
 export const TARGET_SMALL_CHIPS = 10
 export const DEPTH_MIN = 50
 export const DEPTH_MAX = 200
+/** Plafond d'une valeur imposée (points) : garde les calculs entiers exacts. */
+export const MAX_FIXED_VALUE = 1_000_000
 
 /** Série ronde : 1, 2, 5, 10, 25, 50, 100, 250, 500, 1 000, 2 500… */
 const SERIES: number[] = [1, 2, 5]
@@ -133,10 +145,53 @@ function buildSequences(k: number, maxUnits: number): Sequence[] {
   return out
 }
 
+/** Suite de valeurs en points, avec les positions imposées. */
+type FixedSequence = { values: number[]; fixed: boolean[] }
+
+/**
+ * Suites croissantes de `F.length + free` valeurs qui contiennent toutes les valeurs imposées `F`
+ * (triées, distinctes) ; les valeurs libres sont prises dans la série ronde. Aucune valeur ne dépasse
+ * le stack (profondeur × BB, la BB valant deux fois la première valeur).
+ */
+function fixedSequences(F: readonly number[], free: number, depthBB: number): FixedSequence[] {
+  const out: FixedSequence[] = []
+  const k = F.length + free
+  const walk = (values: number[], fixed: boolean[], fi: number) => {
+    if (values.length === k) {
+      if (fi === F.length) out.push({ values, fixed })
+      return
+    }
+    const last = values[values.length - 1]!
+    const lastFixed = fixed[fixed.length - 1]!
+    const maxValue = 2 * depthBB * values[0]!
+    const nextF = F[fi]
+    const ratioOk = (v: number) => v >= 2 * last && v <= 5 * last
+    if (nextF !== undefined && nextF <= maxValue && (lastFixed || ratioOk(nextF))) walk([...values, nextF], [...fixed, true], fi + 1)
+    if (values.length - fi >= free) return
+    for (const v of SERIES) {
+      if (v > 5 * last || v > maxValue || (nextF !== undefined && v >= nextF)) break
+      if (ratioOk(v) && (lastFixed || v % last === 0)) walk([...values, v], [...fixed, false], fi)
+    }
+  }
+  if (F.length === 0) return out
+  walk([F[0]!], [true], 1)
+  if (free > 0) for (const v of SERIES) {
+    if (v >= F[0]!) break
+    walk([v], [false], 0)
+  }
+  return out
+}
+
+function gcd(a: number, b: number): number {
+  while (b) [a, b] = [b, a % b]
+  return a
+}
+
 interface Solution {
   penalty: number
-  sb: number
-  units: number[]
+  /** Couleur de chaque valeur, par valeur croissante. */
+  colors: ChipStock[]
+  values: number[]
   counts: number[]
 }
 
@@ -204,6 +259,7 @@ function sortedStock(stock: readonly ChipStock[]): ChipStock[] {
 /** Recherche de la meilleure répartition ; `firstOnly` s'arrête à la première trouvée (test de faisabilité). */
 function search(input: ChipAssistantInput, firstOnly: boolean): Solution | null {
   const sorted = sortedStock(input.stock)
+  if (sorted.some((s) => s.fixedValue !== undefined)) return searchFixed(input, sorted, firstOnly)
   const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
   const caps = sorted.map((s) => divFloor(s.qty, stacks))
   const target = 2 * input.depthBB // stack en unités de SB
@@ -215,7 +271,38 @@ function search(input: ChipAssistantInput, firstOnly: boolean): Solution | null 
       const r = bestComposition(units, caps.slice(0, k), target)
       if (!r) continue
       if (!best || r.penalty < best.penalty - 1e-9) {
-        best = { penalty: r.penalty, sb, units, counts: r.counts }
+        best = { penalty: r.penalty, colors: sorted.slice(0, k), values: units.map((u) => u * sb), counts: r.counts }
+        if (firstOnly) return best
+      }
+    }
+  }
+  return best
+}
+
+/** Variante avec valeurs imposées : toutes les couleurs imposées + les j libres les plus nombreuses. */
+function searchFixed(input: ChipAssistantInput, sorted: ChipStock[], firstOnly: boolean): Solution | null {
+  const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
+  const cap = (s: ChipStock) => divFloor(s.qty, stacks)
+  const fixed = sorted.filter((s) => s.fixedValue !== undefined).sort((a, b) => a.fixedValue! - b.fixedValue!)
+  const free = sorted.filter((s) => s.fixedValue === undefined)
+  if (fixed.some((s) => cap(s) < 1)) return null
+  const F = fixed.map((s) => s.fixedValue!)
+  let best: Solution | null = null
+  for (let j = 0; j <= free.length; j++) {
+    if (j > 0 && cap(free[j - 1]!) < 1) break
+    if (fixed.length + j < MIN_COLORS_USED) continue
+    for (const { values, fixed: isFixed } of fixedSequences(F, j, input.depthBB)) {
+      let fi = 0
+      let gi = 0
+      const colors = isFixed.map((f) => (f ? fixed[fi++]! : free[gi++]!))
+      const unit = values.reduce(gcd)
+      const units = values.map((v) => v / unit)
+      const target = (2 * input.depthBB * values[0]!) / unit
+      if (units.reduce((s, u) => s + u, 0) > target) continue
+      const r = bestComposition(units, colors.map(cap), target)
+      if (!r) continue
+      if (!best || r.penalty < best.penalty - 1e-9) {
+        best = { penalty: r.penalty, colors, values, counts: r.counts }
         if (firstOnly) return best
       }
     }
@@ -234,6 +321,21 @@ function validateInput(input: ChipAssistantInput): void {
     if (ids.has(s.id)) throw new RangeError(`couleur en double (id ${s.id})`)
     ids.add(s.id)
   }
+  const fixed = input.stock.flatMap((s) => (s.fixedValue === undefined ? [] : [s.fixedValue]))
+  for (const v of fixed) assertInt(v, 'valeur imposée', 1, MAX_FIXED_VALUE)
+  if (new Set(fixed).size !== fixed.length) throw new RangeError('deux couleurs ont la même valeur imposée')
+}
+
+/** Valeurs imposées en double (à signaler dans le formulaire avant d'appeler proposeChips). */
+export function duplicateFixedValues(stock: readonly Pick<ChipStock, 'fixedValue'>[]): Set<number> {
+  const seen = new Set<number>()
+  const dup = new Set<number>()
+  for (const { fixedValue: v } of stock) {
+    if (v === undefined) continue
+    if (seen.has(v)) dup.add(v)
+    seen.add(v)
+  }
+  return dup
 }
 
 /** Meilleure répartition (SPEC §5.3), ou explication de l'échec (SPEC §5.4). */
@@ -241,11 +343,9 @@ export function proposeChips(input: ChipAssistantInput): ChipProposalResult {
   validateInput(input)
   const sol = search(input, false)
   if (!sol) return { ok: false, failure: diagnose(input) }
-  const sorted = sortedStock(input.stock)
   const used = new Map<string, ChipColor>()
-  sol.units.forEach((u, i) => {
-    const s = sorted[i]!
-    used.set(s.id, { id: s.id, name: s.name, hex: s.hex, valuePoints: u * sol.sb, perPlayer: sol.counts[i]!, totalQty: s.qty })
+  sol.colors.forEach((s, i) => {
+    used.set(s.id, { id: s.id, name: s.name, hex: s.hex, valuePoints: sol.values[i]!, perPlayer: sol.counts[i]!, totalQty: s.qty })
   })
   // Couleurs utilisées par valeur croissante, puis la réserve dans l'ordre de saisie.
   const colors = [
@@ -260,14 +360,24 @@ export function proposeChips(input: ChipAssistantInput): ChipProposalResult {
 function diagnose(input: ChipAssistantInput): ChipFailure {
   const sorted = sortedStock(input.stock)
   const stacks = input.maxPlayers * (1 + input.rebuysPerPlayer)
+  const fixedShort = sorted.find((s) => s.fixedValue !== undefined && s.qty < stacks)
   let blocker: ChipBlocker
   if (sorted.length < MIN_COLORS_USED) {
     blocker = { kind: 'tooFewColors' }
+  } else if (fixedShort) {
+    // Une couleur à valeur imposée doit entrer dans chaque stack.
+    blocker = { kind: 'stock', colorName: fixedShort.name, needed: stacks, available: fixedShort.qty }
   } else if (sorted[MIN_COLORS_USED - 1]!.qty < stacks) {
     const s = sorted[MIN_COLORS_USED - 1]!
     blocker = { kind: 'stock', colorName: s.name, needed: stacks, available: s.qty }
   } else if (sorted[0]!.qty < MIN_SMALL_CHIPS * stacks) {
     blocker = { kind: 'smallChips', colorName: sorted[0]!.name, needed: MIN_SMALL_CHIPS * stacks, available: sorted[0]!.qty }
+  } else if (
+    sorted.some((s) => s.fixedValue !== undefined) &&
+    search({ ...input, stock: input.stock.map(({ fixedValue: _, ...s }) => s) }, true)
+  ) {
+    const values = sorted.flatMap((s) => (s.fixedValue === undefined ? [] : [s.fixedValue])).sort((a, b) => a - b)
+    blocker = { kind: 'fixedValues', values }
   } else {
     blocker = { kind: 'composition' }
   }
@@ -282,7 +392,7 @@ function diagnose(input: ChipAssistantInput): ChipFailure {
     if (r !== null) suggestions.rebuysPerPlayer = r
     // Les plafonds ne dépendent pas de la profondeur : la baisser ne lève qu'un blocage de composition
     // (non monotone, d'où le parcours linéaire).
-    if (blocker.kind === 'composition') {
+    if (blocker.kind === 'composition' || blocker.kind === 'fixedValues') {
       for (let d = Math.ceil(input.depthBB / 10) * 10 - 10; d >= DEPTH_MIN; d -= 10) {
         if (feasible({ depthBB: d })) {
           suggestions.depthBB = d
@@ -325,6 +435,9 @@ function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailur
     case 'smallChips':
       why = `Pas assez de petits jetons ${b.colorName} : pour en donner ${MIN_SMALL_CHIPS} à chacun, il en faut ${n(b.needed)} (${stacks}), il y en a ${n(b.available)}.`
       break
+    case 'fixedValues':
+      why = `Aucune répartition ne respecte les valeurs imposées (${b.values.map(n).join(', ')} pts) : entre deux jetons voisins, il faut un rapport de 2 à 5, et assez de petits jetons pour faire la monnaie.`
+      break
     case 'composition':
       why = `Impossible de composer un stack de ${input.depthBB} BB avec ces quantités tout en gardant de quoi faire la monnaie.`
       break
@@ -333,6 +446,7 @@ function failureMessage(input: ChipAssistantInput, b: ChipBlocker, s: ChipFailur
   if (s.maxPlayers !== undefined) fixes.push(`prévoir ${n(s.maxPlayers)} joueurs au plus`)
   if (s.rebuysPerPlayer !== undefined) fixes.push(`prévoir ${plural(s.rebuysPerPlayer, 'recave')} par joueur`)
   if (s.depthBB !== undefined) fixes.push(`descendre à ${s.depthBB} BB`)
+  if (b.kind === 'fixedValues') fixes.push('laisser libre ou changer une des valeurs imposées')
   if (fixes.length === 0) return `${why} Ajouter des jetons ou des couleurs.`
   return `${why} Pour y arriver : ${fixes.join(', ou ')}.`
 }

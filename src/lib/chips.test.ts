@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PER_COLOR,
+  duplicateFixedValues,
   MIN_SMALL_CHIPS,
   TARGET_SMALL_CHIPS,
   proposeChips,
@@ -293,5 +294,56 @@ describe('summarizeChips — édition manuelle', () => {
     const cfg = toChipConfig(proposed, inp.buyInCents, inp.maxPlayers)
     // 10 € pour 100 BB : la BB vaut 10 centimes.
     expect(cfg.bbPoints * cfg.centsPerPoint.num).toBe(10 * cfg.centsPerPoint.den)
+  })
+})
+
+describe('valeurs imposées', () => {
+  /** Mallette de 500 jetons ; `fixed[i]` impose la valeur de la couleur i. */
+  const withFixed = (qty: number[], fixed: (number | undefined)[], patch: Partial<ChipAssistantInput> = {}) =>
+    input(qty, { stock: stock(...qty).map((s, i) => (fixed[i] === undefined ? s : { ...s, fixedValue: fixed[i] })), ...patch })
+
+  it('chaque couleur imposée est utilisée à sa valeur, les autres restent libres', () => {
+    const inp = withFixed([150, 150, 100, 50, 50], [5, 25, 100])
+    const { colors, summary } = proposal(inp)
+    const byId = new Map(colors.map((c) => [c.id, c]))
+    expect([byId.get('c0')!.valuePoints, byId.get('c1')!.valuePoints, byId.get('c2')!.valuePoints]).toEqual([5, 25, 100])
+    for (const id of ['c0', 'c1', 'c2']) expect(byId.get(id)!.perPlayer).toBeGreaterThan(0)
+    expect(summary.issues).toEqual([])
+    expect(summary.sbPoints).toBe(5)
+    expect(summary.stackPoints).toBe(100 * summary.bbPoints)
+  })
+
+  it('accepte des valeurs imprimées non multiples (10 puis 25)', () => {
+    const { colors, summary } = proposal(withFixed([200, 200, 100, 100], [10, 25]))
+    const values = colors.filter((c) => c.perPlayer > 0).map((c) => c.valuePoints)
+    expect(values.indexOf(25) - values.indexOf(10)).toBe(1)
+    expect(summary.issues).toEqual([])
+    expect(summary.stackPoints).toBe(100 * summary.bbPoints)
+  })
+
+  it('une couleur libre peut prendre une valeur sous la plus petite valeur imposée', () => {
+    const { summary } = proposal(withFixed([300, 100, 100, 50], [undefined, 50, 100]))
+    expect(summary.sbPoints).toBeLessThan(50)
+    expect(summary.issues).toEqual([])
+  })
+
+  it('stock insuffisant pour une couleur imposée : elle est nommée', () => {
+    const r = proposeChips(withFixed([150, 150, 100, 50, 10], [undefined, undefined, undefined, undefined, 500]))
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.failure.blocker).toEqual({ kind: 'stock', colorName: 'Noir', needed: 12, available: 10 })
+  })
+
+  it('valeurs imposées incompatibles : le message propose de les libérer', () => {
+    const r = proposeChips(withFixed([150, 150, 100, 100], [1, 1000]))
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.failure.blocker).toEqual({ kind: 'fixedValues', values: [1, 1000] })
+    expect(r.failure.message).toMatch(/valeurs imposées \(1, 1\s000 pts\)/)
+    expect(r.failure.message).toContain('laisser libre')
+  })
+
+  it('refuse deux valeurs imposées identiques', () => {
+    expect(() => proposeChips(withFixed([150, 150, 100, 100], [25, 25]))).toThrow(RangeError)
+    expect(duplicateFixedValues([{ fixedValue: 25 }, {}, { fixedValue: 25 }, { fixedValue: 5 }])).toEqual(new Set([25]))
   })
 })

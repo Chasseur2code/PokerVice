@@ -5,7 +5,7 @@
 import { X } from 'lucide-preact'
 import { useEffect, useId, useState } from 'preact/hooks'
 import { CHIP_PALETTE, DEFAULT_CHIP_COLORS, nextChipColor } from '../../lib/chipColors'
-import { DEPTH_MAX, DEPTH_MIN, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
+import { DEPTH_MAX, DEPTH_MIN, MAX_FIXED_VALUE, duplicateFixedValues, proposeChips, summarizeChips, toChipConfig, type ChipFailure, type ChipIssue } from '../../lib/chips'
 import { summarizePlayers } from '../../lib/derive'
 import { centsToInput, formatCents, parseEuros } from '../../lib/money'
 import { MAX_SEATED, MIN_PLAYERS_TO_START } from '../../lib/players'
@@ -36,6 +36,8 @@ interface StockRow {
   name: string
   hex: string
   qty: string
+  /** Valeur imposée en points ; vide = libre. */
+  value: string
 }
 
 /** Ligne de la proposition, modifiable (valeur et nombre par joueur en texte). */
@@ -52,7 +54,7 @@ let rowCounter = 0
 const rowId = () => `c${++rowCounter}`
 
 function stockRow(entry: { name: string; hex: string }, qty = ''): StockRow {
-  return { id: rowId(), name: entry.name, hex: entry.hex, qty }
+  return { id: rowId(), name: entry.name, hex: entry.hex, qty, value: '' }
 }
 
 export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -92,7 +94,19 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
   const buyInCents = parseEuros(buyIn)
   const buyInValid = buyInCents !== null && buyInCents > 0
   const stockValid = stock.length >= MIN_STOCK && stock.every((r) => r.name.trim() !== '' && (parseCount(r.qty) ?? 0) > 0)
-  const formValid = buyInValid && stockValid
+  // Valeur imposée : vide (libre, `undefined`) ou entier de 1 à MAX_FIXED_VALUE, sans doublon ; `null` = invalide.
+  const fixedOf = (r: StockRow): number | undefined | null => {
+    if (r.value.trim() === '') return undefined
+    const v = parseCount(r.value)
+    return v !== null && v >= 1 && v <= MAX_FIXED_VALUE ? v : null
+  }
+  const duplicates = duplicateFixedValues(stock.map((r) => ({ fixedValue: fixedOf(r) ?? undefined })))
+  const valueInvalid = (r: StockRow) => {
+    const v = fixedOf(r)
+    return v === null || (v !== undefined && duplicates.has(v))
+  }
+  const valuesValid = !stock.some(valueInvalid)
+  const formValid = buyInValid && stockValid && valuesValid
 
   const updateStock = (id: string, patch: Partial<StockRow>) => setStock((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
@@ -114,7 +128,7 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
       maxPlayers,
       rebuysPerPlayer: rebuys,
       depthBB: depth,
-      stock: stock.map((r) => ({ id: r.id, name: r.name.trim(), hex: r.hex, qty: parseCount(r.qty)! })),
+      stock: stock.map((r) => ({ id: r.id, name: r.name.trim(), hex: r.hex, qty: parseCount(r.qty)!, fixedValue: fixedOf(r) ?? undefined })),
     })
     if (result.ok) {
       setRows(result.colors.map((c) => ({ id: c.id, name: c.name, hex: c.hex, totalQty: c.totalQty, value: String(c.valuePoints), perPlayer: String(c.perPlayer) })))
@@ -182,6 +196,11 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
               <legend class="mb-1 font-semibold">
                 Couleurs de la mallette <span class="font-normal text-text-muted">({MIN_STOCK} à {MAX_STOCK})</span>
               </legend>
+              <div class="flex gap-2 text-[12px] text-text-muted" aria-hidden="true">
+                <span class="flex-1 pl-[52px]">Nom</span>
+                <span class="w-20 text-right">Quantité</span>
+                <span class={`w-20 text-right ${stock.length > MIN_STOCK ? 'mr-[52px]' : ''}`}>Valeur (pts)</span>
+              </div>
               {stock.map((row) => (
                 <div key={row.id} class="flex flex-col gap-1">
                   <div class="flex items-end gap-2">
@@ -211,7 +230,17 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
                       inputMode="numeric"
                       placeholder="Qté"
                       invalid={row.qty.trim() !== '' && !(parseCount(row.qty)! > 0)}
-                      class="w-24"
+                      class="w-20"
+                    />
+                    <CompactField
+                      label={`Valeur imposée d'un jeton ${row.name}, en points (vide : libre)`}
+                      hideLabel
+                      value={row.value}
+                      onInput={(value) => updateStock(row.id, { value })}
+                      inputMode="numeric"
+                      placeholder="libre"
+                      invalid={valueInvalid(row)}
+                      class="w-20"
                     />
                     {stock.length > MIN_STOCK && (
                       <button
@@ -253,6 +282,15 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
                 </button>
               )}
               {!stockValid && <p class="text-[13px] text-text-muted">Indiquez un nom et une quantité pour chaque couleur.</p>}
+              {valuesValid ? (
+                <p class="text-[13px] text-text-muted">
+                  Valeur : laissez « libre » pour que l'assistant la choisisse, ou imposez celle imprimée sur vos jetons.
+                </p>
+              ) : (
+                <p class="text-[13px] text-loss">
+                  {duplicates.size > 0 ? 'Deux couleurs ne peuvent pas avoir la même valeur.' : 'Valeur invalide : un nombre entier de points.'}
+                </p>
+              )}
             </fieldset>
 
             {cfg?.mode === 'assistant' && !running && (
