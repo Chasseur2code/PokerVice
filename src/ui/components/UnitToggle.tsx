@@ -1,4 +1,4 @@
-// Bascule d'unité € | Pts | BB de l'en-tête (SPEC §4.1) : n'existe que si une configuration jetons existe.
+// Bascule d'unité € | Pts de l'en-tête (la BB n'est montrée qu'en équivalent, sous les saisies) (SPEC §4.1) : n'existe que si une configuration jetons existe.
 import type { Unit } from '../../lib/types'
 import { gameStore, useGame } from '../../store/useGame'
 import { Segmented, type SegmentedOption } from './Segmented'
@@ -6,7 +6,6 @@ import { Segmented, type SegmentedOption } from './Segmented'
 const OPTIONS: readonly SegmentedOption<Unit>[] = [
   { value: 'eur', label: '€', ariaLabel: 'Euros' },
   { value: 'pts', label: 'Pts', ariaLabel: 'Points' },
-  { value: 'bb', label: 'BB', ariaLabel: 'Big blinds' },
 ]
 
 export function UnitToggle() {

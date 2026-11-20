@@ -120,7 +120,6 @@ describe('saisie dans l’unité courante', () => {
   it('saisit en points seulement avec une configuration et hors €', () => {
     expect(inputUnitFor('eur', cfg)).toBe('eur')
     expect(inputUnitFor('pts', cfg)).toBe('pts')
-    expect(inputUnitFor('bb', cfg)).toBe('pts')
     expect(inputUnitFor('pts', undefined)).toBe('eur')
   })
   it('valeur initiale relisible par parseAmount', () => {

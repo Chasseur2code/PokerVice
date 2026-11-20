@@ -35,7 +35,7 @@
 L'app manipule trois unités :
 - **€**, toujours disponible.
 - **Points** : la valeur des jetons (par exemple « 2 350 »). Il s'agit de la valeur totale, **jamais du nombre de jetons physiques**.
-- **BB** : le nombre de big blinds.
+- **BB** : le nombre de big blinds. Ce n'est pas une unité d'affichage au choix : elle est montrée en équivalent (tapis moyen « soit 156 BB », sous les montants saisis).
 
 Les points et les BB ne sont disponibles que si une **configuration jetons** existe (voir 2.2).
 
@@ -98,7 +98,7 @@ De haut en bas :
 
 ### 4.1 Disposition en partie (portrait)
 De haut en bas :
-1. **En-tête** : logo à gauche ; à droite, la **bascule d'unité € / Pts / BB**, visible seulement si une configuration jetons existe. Elle convertit **tous** les montants affichés dans l'app.
+1. **En-tête** : logo à gauche ; à droite, la **bascule d'unité € / Pts**, visible seulement si une configuration jetons existe. Elle convertit **tous** les montants affichés dans l'app.
 2. **Bandeau de stats** : le **tapis moyen** est mis en avant (à la façon d'un tournoi Winamax), avec en dessous son équivalent « soit 156 BB » si une configuration jetons existe. À côté, en petit : **durée** (chrono), **argent total en jeu**, **nombre de recaves**. Le nombre de joueurs assis n'est **pas** affiché : il se lit directement sur la table.
 3. **La table** : un ovale vertical en **feutre vert**, avec les joueurs placés autour. Au centre : **la BB uniquement** (dans l'unité courante). Sans configuration jetons, le centre affiche le buy-in commun.
 4. **Ligne « Partis »** repliée (par exemple « 1 parti · Thomas +12,40 € »), masquée s'il n'y a aucun joueur parti. Un tap la déplie (voir 4.4).
@@ -181,7 +181,7 @@ Pas de répartition par couleur pour les recaves. L'app affiche seulement l'équ
 Si l'utilisateur répond « Non » à l'aide, le bouton devient **« Convertisseur jetons ↔ € »**. Il ouvre une fenêtre :
 - Champs : **1 point = X €** et **BB = Y points**.
 - Une calculatrice rapide convertit un montant saisi en €, en points et en BB.
-- La validation crée la configuration jetons (sans couleurs, donc sans bandeau jetons). La bascule € / Points / BB devient disponible.
+- La validation crée la configuration jetons (sans couleurs, donc sans bandeau jetons). La bascule € / Points devient disponible.
 - La configuration est verrouillée dès que la partie a démarré.
 
 ---

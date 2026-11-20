@@ -1,6 +1,6 @@
 // Conversions € ↔ points ↔ BB, exactes grâce à la fraction centimes/point.
 import { centsToInput, divFloor, divRound, formatCents, parseEuros, type FormatCentsOptions } from './money'
-import type { ChipConfig, Fraction, Unit } from './types'
+import type { ChipConfig, Fraction, FormatUnit, Unit } from './types'
 
 function gcd(a: number, b: number): number {
   a = Math.abs(a)
@@ -80,7 +80,7 @@ function numberFormatter(maxDecimals: number, sign: boolean): Intl.NumberFormat 
  */
 export function formatAmount(
   cents: number,
-  unit: Unit,
+  unit: FormatUnit,
   cfg: ChipConfig | undefined,
   opts: FormatCentsOptions = {},
 ): string {

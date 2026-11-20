@@ -182,10 +182,10 @@ describe('configuration jetons', () => {
     expect(s().game.chipConfig?.centsPerPoint).toEqual(cfg.centsPerPoint)
   })
 
-  it('les unités Pts et BB exigent une configuration', () => {
+  it('l’unité Pts exige une configuration', () => {
     expect(s().setUnit('pts')).toBe(false)
     s().setChipConfig(cfg)
-    expect(s().setUnit('bb')).toBe(true)
+    expect(s().setUnit('pts')).toBe(true)
     s().setChipConfig(undefined)
     expect(s().unit).toBe('eur')
   })
@@ -429,9 +429,9 @@ describe('annulation', () => {
     s().setChipConfig(cfg)
     s().start()
     s().rebuy(idOf('Hugo'), 2000)
-    s().setUnit('bb')
+    s().setUnit('pts')
     expect(s().undo()).toBe(true)
-    expect(s().unit).toBe('bb')
+    expect(s().unit).toBe('pts')
     expect(computeStats(s().game).rebuyCount).toBe(0)
   })
 
@@ -456,17 +456,17 @@ describe('annulation', () => {
 })
 
 describe('persistance', () => {
-  it('sauvegarde sous la clé pokervice, version 1, sans l’instantané d’annulation', () => {
+  it('sauvegarde sous la clé pokervice, version 2, sans l’instantané d’annulation', () => {
     setupThree()
     const raw = JSON.parse(storage.data.get(STORAGE_KEY)!)
-    expect(raw.version).toBe(1)
+    expect(raw.version).toBe(2)
     expect(Object.keys(raw.state).sort()).toEqual(['game', 'lastRecap', 'unit'])
   })
 
   it('restaure à l’identique après un rechargement, chrono compris (critère 2)', () => {
     setupThree()
     s().setChipConfig(cfg)
-    s().setUnit('bb')
+    s().setUnit('pts')
     s().start()
     later()
     s().rebuy(idOf('Julie'), 2000)
@@ -481,6 +481,18 @@ describe('persistance', () => {
     expect(r.undoable).toBeNull()
     // Le store rechargé reste pleinement utilisable.
     expect(r.rebuy(r.game.players[1]!.id, 2000)).toBe(true)
+  })
+
+  it('migre une sauvegarde v1 en BB (unité retirée) : points avec configuration, euros sans', () => {
+    setupThree()
+    s().setChipConfig(cfg)
+    s().setUnit('pts')
+    const raw = JSON.parse(storage.data.get(STORAGE_KEY)!)
+    storage.data.set(STORAGE_KEY, JSON.stringify({ version: 1, state: { ...raw.state, unit: 'bb' } }))
+    expect(createGameStore(storage).getState().unit).toBe('pts')
+    const noCfg = { ...raw.state, game: { ...raw.state.game, chipConfig: undefined }, unit: 'bb' }
+    storage.data.set(STORAGE_KEY, JSON.stringify({ version: 1, state: noCfg }))
+    expect(createGameStore(storage).getState().unit).toBe('eur')
   })
 
   it('restaure un récap', () => {

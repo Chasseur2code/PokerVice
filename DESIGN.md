@@ -10,7 +10,7 @@
 1. **Une seule chose importante à la fois.** Chaque écran met en avant une action principale. Elle seule a la couleur d'accent.
 2. **Rien d'inutile à l'écran.** On masque ce qui est vide ou sans objet :
    - pas de stats avant « Démarrer » ;
-   - pas de bascule € / Pts / BB sans configuration jetons ;
+   - pas de bascule € / Pts sans configuration jetons ;
    - pas de ligne « Partis » s'il n'y en a aucun ;
    - pas de bandeau jetons sans couleurs connues ;
    - pas d'information qu'on lit déjà ailleurs (par exemple, le nombre de joueurs se voit sur la table).
@@ -161,7 +161,7 @@ De haut en bas, dans une colonne flex :
 ### 4.2 En partie — maquette « A-Partie »
 1. **En-tête** (40 px) :
    - à gauche, le logo ;
-   - à droite, la **bascule segmentée € | Pts | BB** (conteneur `--surface-muted`, segment actif `--surface` avec une ombre légère et un texte de graisse 700). Elle n'apparaît que si une configuration jetons existe ;
+   - à droite, la **bascule segmentée € | Pts** (conteneur `--surface-muted`, segment actif `--surface` avec une ombre légère et un texte de graisse 700). Elle n'apparaît que si une configuration jetons existe ;
    - entre les deux, le bouton icône « Mode sombre » (`moon`, 44 px, présent sur tous les écrans, intégré à `Header`), puis le bouton icône « Écran allumé » (`sun`, 44 px), qui passe en `--accent` quand il est actif.
 2. **Carte de stats** (`--surface`, rayon 16), en deux colonnes :
    - **Gauche** (flexible), avec un filet de 4 px `--accent` sur le bord gauche :

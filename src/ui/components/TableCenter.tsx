@@ -10,7 +10,7 @@ export function TableCenterAmount({ buyInCents, cfg, unit }: { buyInCents: numbe
     <>
       <p class="text-caps font-semibold uppercase text-on-felt-muted">Big blind</p>
       <p class="num font-display text-felt-big font-bold">
-        {/* En pts/BB, la BB s'affiche telle quelle : un aller-retour par les centimes l'arrondirait. */}
+        {/* En pts, la BB s'affiche telle quelle : un aller-retour par les centimes l'arrondirait. */}
         {unit === 'eur' ? formatCents(pointsToCents(cfg.bbPoints, cfg), { compact: true }) : `${fr.format(cfg.bbPoints)} pts`}
       </p>
     </>

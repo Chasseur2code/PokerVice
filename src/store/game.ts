@@ -21,7 +21,7 @@ import type { ChipConfig, DiscrepancyResolution, Game, GameEvent, GameEventType,
 
 export const STORAGE_KEY = 'pokervice'
 /** Version du schéma persisté : l'incrémenter impose d'écrire la migration dans `migrate`. */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const UNDO_MS = 5000
 export const DEFAULT_BUY_IN_CENTS = 1000
 
@@ -404,8 +404,17 @@ export function createGameStore(storage: StateStorage) {
         version: SCHEMA_VERSION,
         storage: createJSONStorage<PersistedState>(() => storage),
         partialize: ({ game, lastRecap, unit }): PersistedState => ({ game, lastRecap, unit }),
-        // Point d'entrée des migrations futures : `if (version < 2) { …transformer… }`.
-        migrate: (persisted) => persisted as PersistedState,
+        // Une migration par version : `if (version < N) { …transformer… }`.
+        migrate: (persisted, version) => {
+          const p = persisted as PersistedState
+          // v2 : l'unité « BB » n'existe plus dans la bascule ; elle passe en points s'il reste une
+          // configuration jetons (partie ou récap), sinon en euros.
+          if (version < 2 && (p.unit as string) === 'bb') {
+            const cfg = p.lastRecap ? p.lastRecap.game.chipConfig : p.game?.chipConfig
+            p.unit = cfg ? 'pts' : 'eur'
+          }
+          return p
+        },
       },
     ),
   )

@@ -8,7 +8,10 @@ export interface Fraction {
 }
 
 /** Unité d'affichage courante (SPEC §2.1). */
-export type Unit = 'eur' | 'pts' | 'bb'
+export type Unit = 'eur' | 'pts'
+
+/** Unité de formatage : celles d'affichage, plus la BB (montrée en équivalent, jamais choisie). */
+export type FormatUnit = Unit | 'bb'
 
 export interface ChipColor {
   id: string

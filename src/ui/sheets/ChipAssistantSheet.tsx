@@ -302,8 +302,7 @@ export function ChipAssistantSheet({ open, onClose }: { open: boolean; onClose: 
               {!stockValid && <p class="text-[13px] text-text-muted">Indiquez un nom et une quantité pour chaque couleur.</p>}
               {valuesValid ? (
                 <p class="text-[13px] text-text-muted">
-                  Valeur en points imprimée sur vos jetons, s'il y en a une. En « auto », PokerVice choisit la meilleure. Une
-                  couleur qui n'entre pas dans le stack reste en réserve.
+                  Valeur en points imprimée sur vos jetons, s'il y en a une. En « auto », PokerVice choisit la meilleure.
                 </p>
               ) : (
                 <p class="text-[13px] text-loss">
@@ -434,7 +433,7 @@ function Proposal({ rows, setRows, colors, summary, buyInCents, running, onBack 
           )}
           <p class="num text-body text-text-muted">
             La réserve permet {summary.rebuysPossible >= MAX_REBUYS_SHOWN ? `${MAX_REBUYS_SHOWN} recaves ou plus` : plural(summary.rebuysPossible, 'recave')}{' '}
-            pour toute la table (gros jetons d'abord : on fait la monnaie à la table).
+            pour toute la table.
             {running && ' Une fois validée, la répartition ne pourra plus être modifiée.'}
           </p>
         </div>
