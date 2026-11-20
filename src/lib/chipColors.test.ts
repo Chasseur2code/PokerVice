@@ -24,4 +24,16 @@ describe('mallettes précomposées', () => {
     })
     expect(result.ok).toBe(true)
   })
+
+  it("la mallette d'Eliott donne une proposition à 6 joueurs avec une recave, 10 € et 100 BB", () => {
+    const kit = CHIP_KITS.find((k) => k.name === "Mallette d'Eliott")!
+    const result = proposeChips({
+      buyInCents: 1000,
+      maxPlayers: 6,
+      rebuysPerPlayer: 1,
+      depthBB: 100,
+      stock: kit.colors.map((c, i) => ({ id: `k${i}`, name: c.color, hex: paletteEntry(c.color).hex, qty: c.qty, fixedValue: c.value })),
+    })
+    expect(result.ok).toBe(true)
+  })
 })

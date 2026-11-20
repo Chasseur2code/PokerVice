@@ -54,6 +54,16 @@ export const CHIP_KITS: readonly ChipKit[] = [
       { color: 'Violet', qty: 23, value: 500 },
     ],
   },
+  {
+    name: "Mallette d'Eliott",
+    colors: [
+      { color: 'Blanc', qty: 100, value: 1 },
+      { color: 'Rouge', qty: 50, value: 5 },
+      { color: 'Vert', qty: 50, value: 25 },
+      { color: 'Bleu', qty: 51, value: 50 },
+      { color: 'Noir', qty: 50, value: 100 },
+    ],
+  },
 ]
 
 /** Entrée de palette d'une couleur de mallette (par son nom). */
